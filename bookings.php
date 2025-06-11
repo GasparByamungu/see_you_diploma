@@ -31,6 +31,7 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://checkout.flutterwave.com/v3.js"></script>
     <style>
         .custom-modal {
             display: none;
@@ -222,6 +223,70 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 default: return 'info';
             }
         }
+
+        function initiatePayment(bookingId) {
+            // Show loading state
+            const payButton = event.target.closest('button');
+            const originalText = payButton.innerHTML;
+            payButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+            payButton.disabled = true;
+
+            // Get payment data from server
+            fetch('process_payment.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'booking_id=' + bookingId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Initialize Flutterwave payment
+                    FlutterwaveCheckout({
+                        ...data.data,
+                        callback: function(response) {
+                            // Handle payment callback
+                            if (response.status === 'successful') {
+                                // Verify payment
+                                window.location.href = `process_payment.php?transaction_id=${response.transaction_id}&booking_id=${bookingId}`;
+                            } else {
+                                alert('Payment failed. Please try again.');
+                                payButton.innerHTML = originalText;
+                                payButton.disabled = false;
+                            }
+                        },
+                        onClose: function() {
+                            // Reset button state when payment modal is closed
+                            payButton.innerHTML = originalText;
+                            payButton.disabled = false;
+                        }
+                    });
+                } else {
+                    alert(data.message || 'Failed to initialize payment');
+                    payButton.innerHTML = originalText;
+                    payButton.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing payment');
+                payButton.innerHTML = originalText;
+                payButton.disabled = false;
+            });
+        }
+
+        // Check for payment status in URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatus = urlParams.get('payment');
+            
+            if (paymentStatus === 'success') {
+                alert('Payment successful! Your booking has been confirmed.');
+            } else if (paymentStatus === 'failed') {
+                alert('Payment failed. Please try again.');
+            }
+        });
     </script>
 </head>
 <body>
@@ -322,6 +387,10 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <i class="bi bi-eye"></i> View Details
                                         </button>
                                         <?php if ($booking['status'] === 'pending'): ?>
+                                        <button type="button" class="btn btn-sm btn-success" 
+                                                onclick="initiatePayment(<?php echo $booking['id']; ?>)">
+                                            <i class="bi bi-credit-card"></i> Pay Now
+                                        </button>
                                         <button type="button" class="btn btn-sm btn-warning" 
                                                 onclick="showModal('rescheduleModal<?php echo $booking['id']; ?>')">
                                             <i class="bi bi-calendar"></i> Reschedule
