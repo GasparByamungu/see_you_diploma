@@ -199,34 +199,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Minibus - Safari Minibus Rentals</title>
+    <title>Book <?php echo htmlspecialchars($minibus['name']); ?> - Safari Minibus Rentals</title>
+    <meta name="description" content="Book your <?php echo htmlspecialchars($minibus['name']); ?> minibus rental with Safari Minibus Rentals. Easy booking process with interactive map selection.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
     <style>
         .booking-summary {
-            background-color: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 8px;
+            background: var(--gradient-secondary);
+            color: white;
+            padding: 2rem;
+            border-radius: var(--radius-lg);
             margin-bottom: 2rem;
+            box-shadow: var(--shadow-lg);
         }
+
+        .booking-summary h3 {
+            color: white;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-item.total {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
         .feature-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(45, 80, 22, 0.05);
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-normal);
         }
+
+        .feature-item:hover {
+            background: rgba(45, 80, 22, 0.1);
+            transform: translateX(5px);
+        }
+
         .feature-icon {
             font-size: 1.5rem;
-            color: #0d6efd;
+            color: var(--primary-color);
+            min-width: 30px;
         }
+
         .price-tag {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #198754;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-color);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .hero-section {
+            background: var(--gradient-primary);
+            color: white;
+            padding: 2rem 0;
+            margin-top: 80px;
+        }
+
+        .booking-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: none;
+            overflow: hidden;
+            position: sticky;
+            top: 100px;
+        }
+
+        .vehicle-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: none;
+            overflow: hidden;
         }
         .map-container {
             margin: 20px 0;
@@ -584,55 +652,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg fixed-top" id="mainNavbar">
         <div class="container">
-            <a class="navbar-brand" href="index.php">Safari Minibus Rentals</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand d-flex align-items-center" href="index.php">
+                <i class="bi bi-truck me-2 fs-4"></i>
+                <span>Safari Minibus Rentals</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="index.php">Home</a>
+                        <a class="nav-link" href="index.php">
+                            <i class="bi bi-house me-1"></i>Home
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="services.php">Our Services</a>
+                        <a class="nav-link" href="services.php">
+                            <i class="bi bi-gear me-1"></i>Our Services
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="about.php">About Us</a>
+                        <a class="nav-link" href="about.php">
+                            <i class="bi bi-info-circle me-1"></i>About Us
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="bookings.php">My Bookings</a>
+                        <a class="nav-link" href="bookings.php">
+                            <i class="bi bi-calendar-check me-1"></i>My Bookings
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="profile.php">My Profile</a>
+                        <a class="nav-link" href="profile.php">
+                            <i class="bi bi-person me-1"></i>My Profile
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="logout.php">Logout</a>
+                        <a class="nav-link" href="logout.php">
+                            <i class="bi bi-box-arrow-right me-1"></i>Logout
+                        </a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <nav aria-label="breadcrumb" class="mb-3">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="index.php" class="text-white text-decoration-none">
+                                    <i class="bi bi-house me-1"></i>Home
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a href="view_minibus.php?id=<?php echo $minibus['id']; ?>" class="text-white text-decoration-none">
+                                    <?php echo htmlspecialchars($minibus['name']); ?>
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item active text-white" aria-current="page">
+                                Book Now
+                            </li>
+                        </ol>
+                    </nav>
+                    <h1 class="display-5 fw-bold mb-3">
+                        <i class="bi bi-calendar-plus me-3"></i>Book Your Journey
+                    </h1>
+                    <p class="lead mb-0">
+                        Complete your booking for <strong><?php echo htmlspecialchars($minibus['name']); ?></strong>
+                        and start your adventure across Tanzania
+                    </p>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <div class="price-display">
+                        <div class="price-tag">TZS <?php echo number_format($minibus['price_per_km']); ?></div>
+                        <small class="text-white opacity-75">per kilometer</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Booking Content -->
-    <div class="container my-5">
+    <div class="container py-5">
         <div class="row">
             <!-- Minibus Details -->
-            <div class="col-lg-8">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h2 class="card-title mb-4"><?php echo htmlspecialchars($minibus['name']); ?></h2>
-                        
+            <div class="col-lg-8 mb-4">
+                <div class="vehicle-card mb-4">
+                    <div class="card-header bg-white border-0 py-4">
+                        <h2 class="mb-0 text-primary fw-bold">
+                            <i class="bi bi-truck me-3"></i><?php echo htmlspecialchars($minibus['name']); ?>
+                        </h2>
+                        <p class="text-muted mb-0">Review vehicle details before booking</p>
+                    </div>
+                    <div class="card-body p-0">
                         <!-- Image Carousel -->
-                        <div id="minibusCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
+                        <div id="minibusCarousel" class="carousel slide" data-bs-ride="carousel">
                             <div class="carousel-inner">
                                 <?php foreach($images as $index => $image): ?>
                                 <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>">
-                                    <img src="<?php echo htmlspecialchars($image); ?>" class="d-block w-100" alt="Minibus" style="height: 400px; object-fit: cover;">
+                                    <img src="<?php echo htmlspecialchars($image); ?>"
+                                         class="d-block w-100"
+                                         alt="<?php echo htmlspecialchars($minibus['name']); ?>"
+                                         style="height: 400px; object-fit: cover;">
                                 </div>
                                 <?php endforeach; ?>
                             </div>
+                            <?php if(count($images) > 1): ?>
                             <button class="carousel-control-prev" type="button" data-bs-target="#minibusCarousel" data-bs-slide="prev">
                                 <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                                 <span class="visually-hidden">Previous</span>
@@ -641,47 +772,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <span class="carousel-control-next-icon" aria-hidden="true"></span>
                                 <span class="visually-hidden">Next</span>
                             </button>
+                            <?php endif; ?>
                         </div>
 
-                        <!-- Features -->
-                        <div class="features mt-4">
-                            <h4>Features</h4>
+                        <!-- Vehicle Information -->
+                        <div class="p-4">
                             <div class="row">
                                 <div class="col-md-6">
+                                    <h5 class="text-primary mb-3">
+                                        <i class="bi bi-info-circle me-2"></i>Vehicle Specifications
+                                    </h5>
                                     <div class="feature-item">
-                                        <i class="bi bi-people-fill"></i>
-                                        <span>Capacity: <?php echo htmlspecialchars($minibus['capacity']); ?> passengers</span>
+                                        <i class="bi bi-people feature-icon"></i>
+                                        <span><strong>Capacity:</strong> <?php echo htmlspecialchars($minibus['capacity']); ?> passengers</span>
                                     </div>
-                                    <?php if (isset($minibus['driver_name']) && $minibus['driver_name']): ?>
                                     <div class="feature-item">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>Driver: <?php echo htmlspecialchars($minibus['driver_name']); ?></span>
+                                        <i class="bi bi-shield-check feature-icon"></i>
+                                        <span><strong>Status:</strong> Available & Ready</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <i class="bi bi-geo-alt feature-icon"></i>
+                                        <span><strong>Coverage:</strong> All Tanzania</span>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <?php if (isset($minibus['driver_name']) && $minibus['driver_name']): ?>
+                                    <h5 class="text-primary mb-3">
+                                        <i class="bi bi-person-badge me-2"></i>Your Driver
+                                    </h5>
+                                    <div class="feature-item">
+                                        <i class="bi bi-person feature-icon"></i>
+                                        <span><strong>Name:</strong> <?php echo htmlspecialchars($minibus['driver_name']); ?></span>
                                     </div>
                                     <?php if(isset($minibus['driver_phone']) && $minibus['driver_phone']): ?>
                                     <div class="feature-item">
-                                        <i class="bi bi-telephone-fill"></i>
-                                        <span>Contact: <a href="tel:<?php echo htmlspecialchars($minibus['driver_phone']); ?>" class="text-decoration-none"><?php echo htmlspecialchars($minibus['driver_phone']); ?></a></span>
+                                        <i class="bi bi-telephone feature-icon"></i>
+                                        <span><strong>Contact:</strong>
+                                            <a href="tel:<?php echo htmlspecialchars($minibus['driver_phone']); ?>"
+                                               class="text-decoration-none text-primary">
+                                                <?php echo htmlspecialchars($minibus['driver_phone']); ?>
+                                            </a>
+                                        </span>
                                     </div>
                                     <?php endif; ?>
-                                    <?php endif; ?>
-                                    <?php 
-                                    foreach ($features as $feature): 
-                                        $icon = match($feature) {
-                                            'Android TV' => 'bi-tv',
-                                            'Music Sound System' => 'bi-music-note-beamed',
-                                            'Fridge' => 'bi-snow',
-                                            'Luggage Space' => 'bi-briefcase-fill',
-                                            'Charging System' => 'bi-lightning-charge-fill',
-                                            default => 'bi-check-circle-fill'
-                                        };
-                                    ?>
+                                    <?php else: ?>
+                                    <h5 class="text-primary mb-3">
+                                        <i class="bi bi-person-badge me-2"></i>Driver Assignment
+                                    </h5>
                                     <div class="feature-item">
-                                        <i class="bi <?php echo $icon; ?>"></i>
-                                        <span><?php echo htmlspecialchars($feature); ?></span>
+                                        <i class="bi bi-clock feature-icon"></i>
+                                        <span>Professional driver will be assigned after booking confirmation</span>
                                     </div>
-                                    <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </div>
                             </div>
+
+                            <?php if(!empty($features)): ?>
+                            <hr class="my-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-star me-2"></i>Features & Amenities
+                            </h5>
+                            <div class="row">
+                                <?php foreach ($features as $feature):
+                                    $icon = match($feature) {
+                                        'Android TV' => 'bi-tv',
+                                        'Music Sound System' => 'bi-music-note-beamed',
+                                        'Fridge' => 'bi-snow',
+                                        'Luggage Space' => 'bi-briefcase-fill',
+                                        'Charging System' => 'bi-lightning-charge-fill',
+                                        default => 'bi-check-circle-fill'
+                                    };
+                                ?>
+                                <div class="col-md-6">
+                                    <div class="feature-item">
+                                        <i class="bi <?php echo $icon; ?> feature-icon"></i>
+                                        <span><?php echo htmlspecialchars($feature); ?></span>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -689,25 +860,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Booking Form -->
             <div class="col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h3 class="card-title mb-4">Book This Minibus</h3>
-
+                <div class="booking-card">
+                    <div class="card-header bg-white border-0 py-4">
+                        <h3 class="mb-0 text-primary fw-bold">
+                            <i class="bi bi-calendar-plus me-2"></i>Complete Your Booking
+                        </h3>
+                        <p class="text-muted mb-0">Fill in the details to reserve your minibus</p>
+                    </div>
+                    <div class="card-body p-4">
                         <?php if ($error_message): ?>
-                            <div class="alert alert-danger">
-                                <?php 
-                                    // Check if the error message contains HTML (our custom booking conflict message)
-                                    if (strpos($error_message, '<br>') !== false) {
-                                        echo $error_message;
-                                    } else {
-                                        echo htmlspecialchars($error_message);
-                                    }
-                                ?>
+                            <div class="alert alert-danger d-flex align-items-start" role="alert">
+                                <i class="bi bi-exclamation-triangle me-2 mt-1"></i>
+                                <div>
+                                    <?php
+                                        // Check if the error message contains HTML (our custom booking conflict message)
+                                        if (strpos($error_message, '<br>') !== false) {
+                                            echo $error_message;
+                                        } else {
+                                            echo htmlspecialchars($error_message);
+                                        }
+                                    ?>
+                                </div>
                             </div>
                         <?php endif; ?>
 
                         <?php if ($success_message): ?>
-                            <div class="alert alert-success"><?php echo $success_message; ?></div>
+                            <div class="alert alert-success d-flex align-items-center" role="alert">
+                                <i class="bi bi-check-circle me-2"></i>
+                                <div><?php echo htmlspecialchars($success_message); ?></div>
+                            </div>
                         <?php else: ?>
                             <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'] . '?id=' . $minibus_id); ?>" id="bookingForm">
                                 <input type="hidden" id="minibus_id" name="minibus_id" value="<?php echo $minibus['id']; ?>">
@@ -724,27 +905,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <input type="hidden" id="route_duration" name="route_duration" value="0">
                                 <input type="hidden" id="total_price" name="total_price" value="0">
                                 <!-- Pickup Date and Time -->
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label for="start_date" class="form-label">Pickup Date</label>
-                                        <input type="date" class="form-control" id="start_date" name="start_date" 
-                                               value="2025-05-29" 
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6 class="text-primary mb-3">
+                                            <i class="bi bi-calendar me-2"></i>When do you need the minibus?
+                                        </h6>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="start_date" class="form-label fw-semibold">
+                                            <i class="bi bi-calendar-date me-2 text-primary"></i>Pickup Date
+                                        </label>
+                                        <input type="date" class="form-control form-control-lg" id="start_date" name="start_date"
+                                               value="<?php echo $selected_date; ?>"
                                                min="<?php echo date('Y-m-d'); ?>" required>
+                                        <small class="text-muted">Select your preferred pickup date</small>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="pickup_time">Pickup Time</label>
-                                            <select class="form-control" id="pickup_time" name="pickup_time" required>
-                                                <option value="">Select Time</option>
-                                                <?php
-                                                for ($hour = 0; $hour < 24; $hour++) {
-                                                    echo "<option value='" . sprintf("%02d:00", $hour) . "'>" . sprintf("%02d:00", $hour) . "</option>";
-                                                    echo "<option value='" . sprintf("%02d:30", $hour) . "'>" . sprintf("%02d:30", $hour) . "</option>";
-                                                }
-                                                ?>
-                                            </select>
-                                        </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="pickup_time" class="form-label fw-semibold">
+                                            <i class="bi bi-clock me-2 text-primary"></i>Pickup Time
+                                        </label>
+                                        <select class="form-select form-select-lg" id="pickup_time" name="pickup_time" required>
+                                            <option value="">Select Time</option>
+                                            <?php
+                                            for ($hour = 6; $hour < 22; $hour++) {
+                                                $time24 = sprintf("%02d:00", $hour);
+                                                $time12 = date('g:i A', strtotime($time24));
+                                                echo "<option value='$time24'>$time12</option>";
+
+                                                $time24_30 = sprintf("%02d:30", $hour);
+                                                $time12_30 = date('g:i A', strtotime($time24_30));
+                                                echo "<option value='$time24_30'>$time12_30</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                        <small class="text-muted">Available 6:00 AM - 10:00 PM</small>
                                     </div>
+                                </div>
+
+                                <!-- Map Section -->
+                                <div class="mb-4">
+                                    <h6 class="text-primary mb-3">
+                                        <i class="bi bi-geo-alt me-2"></i>Select Pickup & Dropoff Locations
+                                    </h6>
+                                    <p class="text-muted mb-3">Click on the map to set your pickup and dropoff locations. The route distance will be calculated automatically.</p>
                                 </div>
 
                                 <div class="map-container">
@@ -787,38 +990,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
 
                                 <div class="booking-summary">
-                                    <h3>Booking Summary</h3>
+                                    <h3>
+                                        <i class="bi bi-receipt me-2"></i>Booking Summary
+                                    </h3>
                                     <div class="summary-item">
-                                        <strong>Pickup Date:</strong>
-                                        <span id="summary_pickup_date"></span>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calendar-date me-2"></i>
+                                            <span>Pickup Date:</span>
+                                        </div>
+                                        <span id="summary_pickup_date" class="fw-bold">Not selected</span>
                                     </div>
                                     <div class="summary-item">
-                                        <strong>Pickup Time:</strong>
-                                        <span id="summary_pickup_time"></span>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-clock me-2"></i>
+                                            <span>Pickup Time:</span>
+                                        </div>
+                                        <span id="summary_pickup_time" class="fw-bold">Not selected</span>
                                     </div>
                                     <div class="summary-item">
-                                        <strong>Route:</strong>
-                                        <span id="summary_pickup_location"></span>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-geo-alt me-2"></i>
+                                            <span>Route:</span>
+                                        </div>
+                                        <span id="summary_pickup_location" class="fw-bold">Select locations</span>
                                     </div>
                                     <div class="summary-item">
-                                        <strong>Route Distance:</strong>
-                                        <span id="summary_route_distance"></span>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-rulers me-2"></i>
+                                            <span>Distance:</span>
+                                        </div>
+                                        <span id="summary_route_distance" class="fw-bold">0 km</span>
                                     </div>
                                     <div class="summary-item">
-                                        <strong>Estimated Duration:</strong>
-                                        <span id="summary_route_duration"></span>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-stopwatch me-2"></i>
+                                            <span>Duration:</span>
+                                        </div>
+                                        <span id="summary_route_duration" class="fw-bold">0 minutes</span>
                                     </div>
                                     <div class="summary-item total">
-                                        <strong>Total Price:</strong>
-                                        <span id="summary_total_price"></span>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calculator me-2"></i>
+                                            <span>Total Amount:</span>
+                                        </div>
+                                        <span id="summary_total_price" class="fw-bold fs-4">TZS 0</span>
                                     </div>
                                 </div>
 
                                 <!-- Add Book Now button -->
                                 <div class="mt-4">
-                                    <button type="submit" class="btn btn-primary btn-lg w-100">
-                                        <i class="fas fa-check-circle me-2"></i>Book Now
+                                    <button type="submit" class="btn btn-primary btn-lg w-100" id="bookNowBtn">
+                                        <i class="bi bi-calendar-check me-2"></i>Complete Booking
                                     </button>
+                                    <small class="text-muted d-block text-center mt-2">
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        Secure booking with instant confirmation
+                                    </small>
                                 </div>
                             </form>
                         <?php endif; ?>
@@ -829,24 +1056,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <!-- Footer -->
-    <footer class="bg-dark text-light py-4">
+    <footer>
         <div class="container">
             <div class="row">
-                <div class="col-md-4">
-                    <h5>Contact Us</h5>
-                    <p>Phone: +255 683749514<br>
-                    Email: info@safariminibus.co.tz</p>
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h5>
+                        <i class="bi bi-truck me-2"></i>Safari Minibus Rentals
+                    </h5>
+                    <p class="mb-3">
+                        Your trusted partner for comfortable and reliable minibus transportation
+                        across Tanzania. Experience the beauty of our country with our premium fleet.
+                    </p>
                 </div>
-                <div class="col-md-4">
+
+                <div class="col-lg-2 col-md-6 mb-4">
                     <h5>Quick Links</h5>
                     <ul class="list-unstyled">
-                        <li><a href="about.php" class="text-light">About Us</a></li>
-                        <li><a href="services.php" class="text-light">Our Services</a></li>
+                        <li class="mb-2"><a href="index.php"><i class="bi bi-house me-2"></i>Home</a></li>
+                        <li class="mb-2"><a href="about.php"><i class="bi bi-info-circle me-2"></i>About Us</a></li>
+                        <li class="mb-2"><a href="services.php"><i class="bi bi-gear me-2"></i>Our Services</a></li>
+                        <li class="mb-2"><a href="bookings.php"><i class="bi bi-calendar-check me-2"></i>My Bookings</a></li>
+                        <li class="mb-2"><a href="profile.php"><i class="bi bi-person me-2"></i>My Profile</a></li>
                     </ul>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5>Contact Information</h5>
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-telephone me-3 text-accent"></i>
+                            <span>+255 683749514</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-envelope me-3 text-accent"></i>
+                            <span>info@safariminibus.co.tz</span>
+                        </div>
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-geo-alt me-3 text-accent mt-1"></i>
+                            <span>Dar es Salaam, Tanzania</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4" style="border-color: rgba(255, 255, 255, 0.2);">
+
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="mb-0">
+                        &copy; <?php echo date('Y'); ?> Safari Minibus Rentals. All rights reserved.
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
                 </div>
             </div>
         </div>
     </footer>
+
+    <!-- Back to Top Button -->
+    <button type="button" class="btn btn-primary position-fixed bottom-0 end-0 m-4 rounded-circle" id="backToTop" style="width: 50px; height: 50px; display: none; z-index: 1000;">
+        <i class="bi bi-arrow-up"></i>
+    </button>
 
     <!-- Add required JavaScript libraries -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -855,7 +1125,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
     <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('mainNavbar');
+            const backToTop = document.getElementById('backToTop');
+
+            if (window.scrollY > 100) {
+                navbar.classList.add('scrolled');
+                backToTop.style.display = 'block';
+            } else {
+                navbar.classList.remove('scrolled');
+                backToTop.style.display = 'none';
+            }
+        });
+
+        // Back to top functionality
+        document.getElementById('backToTop').addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+
+        // Form validation and enhancement
         document.addEventListener('DOMContentLoaded', function() {
+            // Add loading state to form submission
+            const bookingForm = document.getElementById('bookingForm');
+            if (bookingForm) {
+                bookingForm.addEventListener('submit', function(e) {
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+
+                    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Processing Booking...';
+                    submitBtn.disabled = true;
+
+                    // Re-enable button after 10 seconds in case of error
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }, 10000);
+                });
+            }
+
+            // Update booking summary when form fields change
+            function updateBookingSummary() {
+                const startDate = document.getElementById('start_date').value;
+                const pickupTime = document.getElementById('pickup_time').value;
+                const routeDistance = document.getElementById('route_distance').value;
+                const pricePerKm = document.getElementById('price_per_km').value;
+
+                // Update summary display
+                document.getElementById('summary_pickup_date').textContent = startDate ? new Date(startDate).toLocaleDateString() : 'Not selected';
+                document.getElementById('summary_pickup_time').textContent = pickupTime || 'Not selected';
+
+                if (routeDistance && pricePerKm) {
+                    const totalPrice = Math.ceil(parseFloat(routeDistance) * parseFloat(pricePerKm));
+                    document.getElementById('summary_total_price').textContent = 'TZS ' + totalPrice.toLocaleString();
+                    document.getElementById('total_price').value = totalPrice;
+                } else {
+                    document.getElementById('summary_total_price').textContent = 'TZS 0';
+                }
+            }
+
+            // Add event listeners for form fields
+            ['start_date', 'pickup_time'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('change', updateBookingSummary);
+                }
+            });
+
             // Initialize map
             const routeMap = L.map('routeMap').setView([-6.7924, 39.2083], 13);
 

@@ -17,44 +17,57 @@ if (isset($_POST['delete_minibus'])) {
     exit();
 }
 
-// Diagnostic queries to check database state
-echo "<!-- Database Diagnostic Information -->\n";
+// Note: Issue with duplicate minibus display has been fixed by using separate queries
+// instead of complex JOINs that could cause duplication
 
-// Check for duplicate minibuses
-$minibuses_check = $pdo->query("
-    SELECT id, name, COUNT(*) as count 
-    FROM minibuses 
-    GROUP BY id, name 
-    HAVING COUNT(*) > 1
-")->fetchAll(PDO::FETCH_ASSOC);
-echo "<!-- Duplicate minibuses found: " . count($minibuses_check) . " -->\n";
-
-// Get all minibuses with their images and driver information
-$stmt = $pdo->query("
-    SELECT DISTINCT 
-           m.id, m.name, m.capacity, m.price_per_km, m.features, 
-           m.status, m.driver_id, m.created_at,
-           d.name as driver_name, d.license_number, d.phone as driver_phone,
-           GROUP_CONCAT(DISTINCT mi.image_path ORDER BY mi.display_order) as images
-    FROM minibuses m 
-    LEFT JOIN drivers d ON m.driver_id = d.id 
-    LEFT JOIN minibus_images mi ON m.id = mi.minibus_id 
-    GROUP BY m.id, m.name, m.capacity, m.price_per_km, m.features, 
-             m.status, m.driver_id, m.created_at,
-             d.name, d.license_number, d.phone
+// Get all minibuses first
+$minibuses_stmt = $pdo->query("
+    SELECT m.id, m.name, m.capacity, m.price_per_km, m.features,
+           m.status, m.driver_id, m.created_at
+    FROM minibuses m
     ORDER BY m.created_at DESC
 ");
-$minibuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$minibuses = $minibuses_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Debug: Print the query results
-echo "<!-- Debug: Number of minibuses found: " . count($minibuses) . " -->\n";
-foreach ($minibuses as $minibus) {
-    echo "<!-- Debug: Minibus ID: " . $minibus['id'] . 
-         ", Name: " . $minibus['name'] . 
-         ", Driver ID: " . $minibus['driver_id'] . 
-         ", Driver Name: " . ($minibus['driver_name'] ?? 'None') . 
-         ", Images: " . ($minibus['images'] ?? 'None') . " -->\n";
+// For each minibus, get driver and images separately to avoid JOIN issues
+foreach ($minibuses as &$minibus) {
+    // Get driver information
+    if ($minibus['driver_id']) {
+        $driver_stmt = $pdo->prepare("
+            SELECT name as driver_name, license_number, phone as driver_phone
+            FROM drivers WHERE id = ?
+        ");
+        $driver_stmt->execute([$minibus['driver_id']]);
+        $driver = $driver_stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($driver) {
+            $minibus['driver_name'] = $driver['driver_name'];
+            $minibus['license_number'] = $driver['license_number'];
+            $minibus['driver_phone'] = $driver['driver_phone'];
+        } else {
+            $minibus['driver_name'] = null;
+            $minibus['license_number'] = null;
+            $minibus['driver_phone'] = null;
+        }
+    } else {
+        $minibus['driver_name'] = null;
+        $minibus['license_number'] = null;
+        $minibus['driver_phone'] = null;
+    }
+
+    // Get images
+    $images_stmt = $pdo->prepare("
+        SELECT image_path FROM minibus_images
+        WHERE minibus_id = ?
+        ORDER BY display_order
+    ");
+    $images_stmt->execute([$minibus['id']]);
+    $images = $images_stmt->fetchAll(PDO::FETCH_COLUMN);
+    $minibus['images'] = implode(',', $images);
 }
+
+// Debug information (can be removed in production)
+echo "<!-- Number of minibuses found: " . count($minibuses) . " -->\n";
 
 // Process the images string into arrays
 foreach ($minibuses as &$minibus) {
@@ -63,19 +76,11 @@ foreach ($minibuses as &$minibus) {
 
 // Get available drivers for assignment
 $available_drivers = $pdo->query("
-    SELECT id, name, license_number 
-    FROM drivers 
+    SELECT id, name, license_number
+    FROM drivers
     WHERE status = 'available'
     ORDER BY name
 ")->fetchAll(PDO::FETCH_ASSOC);
-
-// Debug: Print available drivers
-echo "<!-- Debug: Number of available drivers: " . count($available_drivers) . " -->\n";
-foreach ($available_drivers as $driver) {
-    echo "<!-- Debug: Driver ID: " . $driver['id'] . 
-         ", Name: " . $driver['name'] . 
-         ", License: " . $driver['license_number'] . " -->\n";
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -83,58 +88,105 @@ foreach ($available_drivers as $driver) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Minibuses - Safari Minibus Rentals</title>
+    <meta name="description" content="Admin panel for managing minibus fleet, adding new vehicles, and updating existing ones.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
     <style>
         .image-preview {
             width: 100%;
             height: 150px;
-            border: 2px dashed #ccc;
-            border-radius: 4px;
+            border: 2px dashed rgba(45, 80, 22, 0.3);
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            background-color: #f8f9fa;
+            background-color: var(--light-gray);
+            transition: all var(--transition-normal);
+        }
+
+        .image-preview:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(45, 80, 22, 0.05);
         }
 
         .image-preview img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+            border-radius: var(--radius-sm);
         }
 
         .image-preview.empty {
-            color: #6c757d;
+            color: var(--gray);
             font-size: 0.875rem;
+            font-weight: 500;
         }
+
+        .minibus-table-image {
+            width: 80px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--light-gray);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .status-available { background-color: var(--success); }
+        .status-booked { background-color: var(--warning); }
+        .status-maintenance { background-color: var(--danger); }
     </style>
 </head>
-<body>
+<body class="bg-light">
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg admin-nav">
         <div class="container">
-            <a class="navbar-brand" href="../index.php">Safari Minibus Rentals</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand d-flex align-items-center" href="../index.php">
+                <i class="bi bi-shield-check me-2 fs-4"></i>
+                <span>Safari Admin Panel</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="dashboard.php">Dashboard</a>
+                        <a class="nav-link" href="dashboard.php">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="minibuses.php">Minibuses</a>
+                        <a class="nav-link active" href="minibuses.php">
+                            <i class="bi bi-truck me-1"></i>Minibuses
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="drivers.php">Drivers</a>
+                        <a class="nav-link" href="drivers.php">
+                            <i class="bi bi-person-badge me-1"></i>Drivers
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="bookings.php">Bookings</a>
+                        <a class="nav-link" href="bookings.php">
+                            <i class="bi bi-calendar-check me-1"></i>Bookings
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="../logout.php">Logout</a>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle me-1"></i><?php echo htmlspecialchars($_SESSION['user_name']); ?>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="../index.php"><i class="bi bi-house me-2"></i>View Site</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="../logout.php"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -142,92 +194,191 @@ foreach ($available_drivers as $driver) {
     </nav>
 
     <!-- Main Content -->
-    <div class="container my-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Manage Minibuses</h2>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMinibusModal">
-                <i class="bi bi-plus-circle"></i> Add New Minibus
-            </button>
+    <div class="container py-5">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                    <div class="mb-3 mb-md-0">
+                        <h1 class="display-6 fw-bold text-primary mb-2">
+                            <i class="bi bi-truck me-3"></i>Fleet Management
+                        </h1>
+                        <p class="text-muted mb-0">Manage your minibus fleet, add new vehicles, and update existing ones</p>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#addMinibusModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add New Minibus
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fleet Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-truck display-6 mb-2"></i>
+                        <h4><?php echo count($minibuses); ?></h4>
+                        <small>Total Fleet</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle display-6 mb-2"></i>
+                        <h4><?php echo count(array_filter($minibuses, fn($m) => $m['status'] === 'available')); ?></h4>
+                        <small>Available</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-calendar-check display-6 mb-2"></i>
+                        <h4><?php echo count(array_filter($minibuses, fn($m) => $m['status'] === 'booked')); ?></h4>
+                        <small>Booked</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-tools display-6 mb-2"></i>
+                        <h4><?php echo count(array_filter($minibuses, fn($m) => $m['status'] === 'maintenance')); ?></h4>
+                        <small>Maintenance</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Minibuses Table -->
-        <div class="card">
-            <div class="card-body">
+        <div class="card border-0 shadow-custom">
+            <div class="card-header bg-white border-0 py-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 text-primary">
+                        <i class="bi bi-list-ul me-2"></i>Minibus Fleet
+                    </h4>
+                    <div class="d-flex gap-2">
+                        <div class="input-group" style="width: 250px;">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Search minibuses..." id="searchInput">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <?php if (empty($minibuses)): ?>
+                <div class="text-center py-5">
+                    <i class="bi bi-truck display-1 text-muted mb-3"></i>
+                    <h5 class="text-muted">No Minibuses Found</h5>
+                    <p class="text-muted">Start building your fleet by adding your first minibus.</p>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMinibusModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add First Minibus
+                    </button>
+                </div>
+                <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table table-hover mb-0" id="minibusTable">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Images</th>
-                                <th>Name</th>
-                                <th>Capacity</th>
-                                <th>Price/1km (TZS)</th>
-                                <th>Features</th>
-                                <th>Driver</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th class="border-0 py-3">Vehicle</th>
+                                <th class="border-0 py-3">Details</th>
+                                <th class="border-0 py-3">Features</th>
+                                <th class="border-0 py-3">Driver</th>
+                                <th class="border-0 py-3">Status</th>
+                                <th class="border-0 py-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($minibuses as $minibus): ?>
-                            <tr>
-                                <td><?php echo $minibus['id']; ?></td>
-                                <td>
-                                    <div class="image-preview-container">
-                                        <?php if (!empty($minibus['images'])): ?>
-                                            <?php foreach ($minibus['images'] as $image): ?>
-                                                <img src="../<?php echo htmlspecialchars($image); ?>" alt="Minibus" class="image-preview">
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <div class="bg-secondary text-white" style="width: 100px; height: 60px; display: flex; align-items: center; justify-content: center;">
-                                                No Image
-                                            </div>
+                            <tr class="minibus-row">
+                                <td class="py-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            <?php if (!empty($minibus['images'])): ?>
+                                                <img src="../<?php echo htmlspecialchars($minibus['images'][0]); ?>"
+                                                     alt="<?php echo htmlspecialchars($minibus['name']); ?>"
+                                                     class="minibus-table-image">
+                                            <?php else: ?>
+                                                <div class="minibus-table-image bg-light d-flex align-items-center justify-content-center">
+                                                    <i class="bi bi-image text-muted"></i>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div>
+                                            <div class="fw-semibold text-primary"><?php echo htmlspecialchars($minibus['name']); ?></div>
+                                            <small class="text-muted">ID: #<?php echo str_pad($minibus['id'], 3, '0', STR_PAD_LEFT); ?></small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3">
+                                    <div>
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-people me-1 text-primary"></i>
+                                            <?php echo $minibus['capacity']; ?> Passengers
+                                        </div>
+                                        <div class="text-success fw-semibold">
+                                            <i class="bi bi-currency-exchange me-1"></i>
+                                            TZS <?php echo number_format($minibus['price_per_km']); ?>/km
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <?php
+                                        $features = json_decode($minibus['features'] ?? '[]', true);
+                                        $displayFeatures = array_slice($features, 0, 3);
+                                        foreach ($displayFeatures as $feature): ?>
+                                            <span class="badge bg-primary-light text-primary"><?php echo htmlspecialchars($feature); ?></span>
+                                        <?php endforeach; ?>
+                                        <?php if (count($features) > 3): ?>
+                                            <span class="badge bg-secondary">+<?php echo count($features) - 3; ?></span>
                                         <?php endif; ?>
                                     </div>
                                 </td>
-                                <td><?php echo htmlspecialchars($minibus['name']); ?></td>
-                                <td><?php echo $minibus['capacity']; ?> passengers</td>
-                                <td><?php echo number_format($minibus['price_per_km']); ?></td>
-                                <td>
-                                    <?php 
-                                    $features = json_decode($minibus['features'] ?? '[]', true);
-                                    foreach ($features as $feature): ?>
-                                        <span class="badge bg-info me-1"><?php echo htmlspecialchars($feature); ?></span>
-                                    <?php endforeach; ?>
-                                </td>
-                                <td>
+                                <td class="py-3">
                                     <?php if ($minibus['driver_id'] && $minibus['driver_name']): ?>
-                                        <?php echo htmlspecialchars($minibus['driver_name']); ?>
-                                        <br>
-                                        <small class="text-muted">
-                                            License: <?php echo htmlspecialchars($minibus['license_number']); ?><br>
-                                            Phone: <?php echo htmlspecialchars($minibus['driver_phone']); ?>
-                                        </small>
+                                        <div>
+                                            <div class="fw-semibold"><?php echo htmlspecialchars($minibus['driver_name']); ?></div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-card-text me-1"></i><?php echo htmlspecialchars($minibus['license_number']); ?>
+                                            </small>
+                                        </div>
                                     <?php else: ?>
-                                        <span class="text-muted">No driver assigned</span>
+                                        <span class="text-muted">
+                                            <i class="bi bi-person-x me-1"></i>Not assigned
+                                        </span>
                                     <?php endif; ?>
                                 </td>
-                                <td>
-                                    <span class="badge bg-<?php 
-                                        echo $minibus['status'] == 'available' ? 'success' : 
-                                            ($minibus['status'] == 'booked' ? 'warning' : 'danger'); 
-                                    ?>">
+                                <td class="py-3">
+                                    <span class="status-indicator status-<?php echo $minibus['status']; ?>"></span>
+                                    <span class="badge bg-<?php
+                                        echo $minibus['status'] == 'available' ? 'success' :
+                                            ($minibus['status'] == 'booked' ? 'warning' : 'danger');
+                                    ?> px-3 py-2">
                                         <?php echo ucfirst($minibus['status']); ?>
                                     </span>
                                 </td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="editMinibus(<?php echo htmlspecialchars(json_encode($minibus)); ?>)">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteMinibus(<?php echo $minibus['id']; ?>)">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                <td class="py-3">
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                onclick="editMinibus(<?php echo htmlspecialchars(json_encode($minibus)); ?>)"
+                                                title="Edit Minibus">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                onclick="deleteMinibus(<?php echo $minibus['id']; ?>)"
+                                                title="Delete Minibus">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -508,6 +659,44 @@ foreach ($available_drivers as $driver) {
                 }
             });
         });
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('.minibus-row');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // Add loading states to buttons
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function() {
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Processing...';
+                    submitBtn.disabled = true;
+
+                    // Re-enable after 5 seconds in case of error
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }, 5000);
+                }
+            });
+        });
+
+        // Auto-refresh page every 5 minutes
+        setInterval(() => {
+            window.location.reload();
+        }, 300000);
     </script>
 </body>
 </html> 

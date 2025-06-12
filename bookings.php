@@ -28,9 +28,10 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Bookings - Safari Minibus Rentals</title>
+    <meta name="description" content="View and manage your Safari Minibus Rentals bookings, track status, and make payments.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
     <script src="https://checkout.flutterwave.com/v3.js"></script>
     <style>
         .custom-modal {
@@ -291,31 +292,46 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg fixed-top" id="mainNavbar">
         <div class="container">
-            <a class="navbar-brand" href="index.php">Safari Minibus Rentals</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand d-flex align-items-center" href="index.php">
+                <i class="bi bi-truck me-2 fs-4"></i>
+                <span>Safari Minibus Rentals</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="index.php">Home</a>
+                        <a class="nav-link" href="index.php">
+                            <i class="bi bi-house me-1"></i>Home
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="services.php">Our Services</a>
+                        <a class="nav-link" href="services.php">
+                            <i class="bi bi-gear me-1"></i>Our Services
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="about.php">About Us</a>
+                        <a class="nav-link" href="about.php">
+                            <i class="bi bi-info-circle me-1"></i>About Us
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="bookings.php">My Bookings</a>
+                        <a class="nav-link active" href="bookings.php">
+                            <i class="bi bi-calendar-check me-1"></i>My Bookings
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="profile.php">My Profile</a>
+                        <a class="nav-link" href="profile.php">
+                            <i class="bi bi-person me-1"></i>My Profile
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="logout.php">Logout</a>
+                        <a class="nav-link" href="logout.php">
+                            <i class="bi bi-box-arrow-right me-1"></i>Logout
+                        </a>
                     </li>
                 </ul>
             </div>
@@ -323,83 +339,176 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </nav>
 
     <!-- Main Content -->
-    <div class="container my-5">
-        <h2 class="mb-4">My Bookings</h2>
+    <div class="container py-5" style="margin-top: 80px;">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                    <div class="mb-3 mb-md-0">
+                        <h1 class="display-6 fw-bold text-primary mb-2">
+                            <i class="bi bi-calendar-check me-3"></i>My Bookings
+                        </h1>
+                        <p class="text-muted mb-0">Track and manage your minibus reservations</p>
+                    </div>
+                    <a href="index.php" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-2"></i>New Booking
+                    </a>
+                </div>
+            </div>
+        </div>
 
         <?php if (empty($bookings)): ?>
-            <div class="alert alert-info">
-                You haven't made any bookings yet. <a href="index.php">Browse our minibuses</a> to make a booking.
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 shadow-custom text-center py-5">
+                        <div class="card-body">
+                            <i class="bi bi-calendar-x display-1 text-muted mb-4"></i>
+                            <h3 class="text-muted mb-3">No Bookings Yet</h3>
+                            <p class="text-muted mb-4">You haven't made any bookings yet. Start your journey by booking your first minibus!</p>
+                            <a href="index.php" class="btn btn-primary btn-lg">
+                                <i class="bi bi-search me-2"></i>Browse Minibuses
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         <?php else: ?>
-            <!-- Bookings Table -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Booking ID</th>
-                                    <th>Minibus</th>
-                                    <th>Driver</th>
-                                    <th>Dates</th>
-                                    <th>Pickup</th>
-                                    <th>Total Price</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($bookings as $booking): ?>
-                                <tr>
-                                    <td>#<?php echo $booking['id']; ?></td>
-                                    <td>
-                                        <?php echo htmlspecialchars($booking['minibus_name']); ?><br>
-                                        <small class="text-muted"><?php echo $booking['capacity']; ?> seats</small>
-                                    </td>
-                                    <td>
-                                        <?php if ($booking['driver_name']): ?>
-                                            <?php echo htmlspecialchars($booking['driver_name']); ?><br>
-                                            <small class="text-muted"><?php echo htmlspecialchars($booking['driver_phone']); ?></small>
-                                        <?php else: ?>
-                                            <span class="text-muted">Not assigned yet</span>
+            <!-- Bookings Grid -->
+            <div class="row">
+                <?php foreach ($bookings as $booking): ?>
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="card border-0 shadow-custom h-100 booking-card">
+                        <div class="card-header bg-white border-0 py-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 fw-bold text-primary">
+                                    <i class="bi bi-calendar-check me-2"></i>
+                                    Booking #<?php echo str_pad($booking['id'], 4, '0', STR_PAD_LEFT); ?>
+                                </h6>
+                                <span class="badge bg-<?php
+                                    echo $booking['status'] == 'confirmed' ? 'success' :
+                                        ($booking['status'] == 'pending' ? 'warning' :
+                                        ($booking['status'] == 'cancelled' ? 'danger' : 'info'));
+                                ?> px-3 py-2">
+                                    <i class="bi bi-<?php
+                                        echo $booking['status'] == 'confirmed' ? 'check-circle' :
+                                            ($booking['status'] == 'pending' ? 'clock' :
+                                            ($booking['status'] == 'cancelled' ? 'x-circle' : 'info-circle'));
+                                    ?> me-1"></i>
+                                    <?php echo ucfirst($booking['status']); ?>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h5 class="card-title text-primary mb-2">
+                                    <i class="bi bi-truck me-2"></i>
+                                    <?php echo htmlspecialchars($booking['minibus_name']); ?>
+                                </h5>
+                                <p class="text-muted mb-0">
+                                    <i class="bi bi-people me-1"></i><?php echo $booking['capacity']; ?> seats capacity
+                                </p>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="d-flex align-items-center text-muted">
+                                            <i class="bi bi-calendar me-2"></i>
+                                            <small><?php echo date('M d, Y', strtotime($booking['start_date'])); ?></small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="d-flex align-items-center text-muted">
+                                            <i class="bi bi-clock me-2"></i>
+                                            <small><?php echo date('h:i A', strtotime($booking['pickup_time'])); ?></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-geo-alt me-2 text-primary mt-1"></i>
+                                    <div>
+                                        <small class="text-muted">Pickup Location</small>
+                                        <div class="fw-semibold"><?php echo htmlspecialchars($booking['pickup_location']); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if ($booking['driver_name']): ?>
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-person-badge me-2 text-primary"></i>
+                                    <div>
+                                        <small class="text-muted">Driver</small>
+                                        <div class="fw-semibold"><?php echo htmlspecialchars($booking['driver_name']); ?></div>
+                                        <?php if ($booking['driver_phone']): ?>
+                                        <small class="text-muted">
+                                            <i class="bi bi-telephone me-1"></i>
+                                            <?php echo htmlspecialchars($booking['driver_phone']); ?>
+                                        </small>
                                         <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php echo date('M d, Y', strtotime($booking['start_date'])); ?>
-                                    </td>
-                                    <td>
-                                        <?php echo htmlspecialchars($booking['pickup_location']); ?><br>
-                                        <small class="text-muted"><?php echo date('h:i A', strtotime($booking['pickup_time'])); ?></small>
-                                    </td>
-                                    <td>TZS <?php echo number_format($booking['total_price']); ?></td>
-                                    <td>
-                                        <span class="badge bg-<?php 
-                                            echo $booking['status'] == 'confirmed' ? 'success' : 
-                                                ($booking['status'] == 'pending' ? 'warning' : 
-                                                ($booking['status'] == 'cancelled' ? 'danger' : 'info')); 
-                                        ?>">
-                                            <?php echo ucfirst($booking['status']); ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-primary" 
-                                                onclick="viewBooking(<?php echo $booking['id']; ?>)">
-                                            <i class="bi bi-eye"></i> View Details
-                                        </button>
-                                        <?php if ($booking['status'] === 'pending'): ?>
-                                        <button type="button" class="btn btn-sm btn-success" 
+                                    </div>
+                                </div>
+                            </div>
+                            <?php else: ?>
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center text-muted">
+                                    <i class="bi bi-person-x me-2"></i>
+                                    <small>Driver not assigned yet</small>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <div class="mb-3">
+                                <div class="price-display text-center py-2 bg-light rounded">
+                                    <div class="fw-bold text-success fs-5">
+                                        TZS <?php echo number_format($booking['total_price']); ?>
+                                    </div>
+                                    <small class="text-muted">Total Amount</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0 pt-0">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        onclick="viewBooking(<?php echo $booking['id']; ?>)">
+                                    <i class="bi bi-eye me-2"></i>View Details
+                                </button>
+
+                                <?php if ($booking['status'] === 'pending'): ?>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-success btn-sm w-100"
                                                 onclick="initiatePayment(<?php echo $booking['id']; ?>)">
-                                            <i class="bi bi-credit-card"></i> Pay Now
+                                            <i class="bi bi-credit-card me-1"></i>Pay Now
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-warning" 
-                                                onclick="showModal('rescheduleModal<?php echo $booking['id']; ?>')">
-                                            <i class="bi bi-calendar"></i> Reschedule
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-danger" 
-                                                onclick="showModal('cancelModal<?php echo $booking['id']; ?>')">
-                                            <i class="bi bi-x-circle"></i> Cancel
-                                        </button>
-                                        <?php endif; ?>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="dropdown w-100">
+                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-three-dots me-1"></i>More
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <button class="dropdown-item" onclick="showModal('rescheduleModal<?php echo $booking['id']; ?>')">
+                                                        <i class="bi bi-calendar me-2"></i>Reschedule
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item text-danger" onclick="showModal('cancelModal<?php echo $booking['id']; ?>')">
+                                                        <i class="bi bi-x-circle me-2"></i>Cancel
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                                         <!-- View Booking Modal -->
                                         <div id="viewBookingModal<?php echo $booking['id']; ?>" class="custom-modal">
@@ -521,35 +630,119 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 </form>
                                             </div>
                                         </div>
-                                    </td>
-                                </tr>
                                 <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         <?php endif; ?>
     </div>
 
     <!-- Footer -->
-    <footer class="bg-dark text-light py-4">
+    <footer>
         <div class="container">
             <div class="row">
-                <div class="col-md-4">
-                    <h5>Contact Us</h5>
-                    <p>Phone: +255 683749514<br>
-                    Email: info@safariminibus.co.tz</p>
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h5>
+                        <i class="bi bi-truck me-2"></i>Safari Minibus Rentals
+                    </h5>
+                    <p class="mb-3">
+                        Your trusted partner for comfortable and reliable minibus transportation
+                        across Tanzania. Experience the beauty of our country with our premium fleet.
+                    </p>
                 </div>
-                <div class="col-md-4">
+
+                <div class="col-lg-2 col-md-6 mb-4">
                     <h5>Quick Links</h5>
                     <ul class="list-unstyled">
-                        <li><a href="about.php" class="text-light">About Us</a></li>
-                        <li><a href="services.php" class="text-light">Our Services</a></li>
+                        <li class="mb-2"><a href="index.php"><i class="bi bi-house me-2"></i>Home</a></li>
+                        <li class="mb-2"><a href="about.php"><i class="bi bi-info-circle me-2"></i>About Us</a></li>
+                        <li class="mb-2"><a href="services.php"><i class="bi bi-gear me-2"></i>Our Services</a></li>
+                        <li class="mb-2"><a href="bookings.php"><i class="bi bi-calendar-check me-2"></i>My Bookings</a></li>
+                        <li class="mb-2"><a href="profile.php"><i class="bi bi-person me-2"></i>My Profile</a></li>
                     </ul>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5>Contact Information</h5>
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-telephone me-3 text-accent"></i>
+                            <span>+255 683749514</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-envelope me-3 text-accent"></i>
+                            <span>info@safariminibus.co.tz</span>
+                        </div>
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-geo-alt me-3 text-accent mt-1"></i>
+                            <span>Dar es Salaam, Tanzania</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4" style="border-color: rgba(255, 255, 255, 0.2);">
+
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="mb-0">
+                        &copy; <?php echo date('Y'); ?> Safari Minibus Rentals. All rights reserved.
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
                 </div>
             </div>
         </div>
     </footer>
+
+    <!-- Back to Top Button -->
+    <button type="button" class="btn btn-primary position-fixed bottom-0 end-0 m-4 rounded-circle" id="backToTop" style="width: 50px; height: 50px; display: none; z-index: 1000;">
+        <i class="bi bi-arrow-up"></i>
+    </button>
+
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('mainNavbar');
+            const backToTop = document.getElementById('backToTop');
+
+            if (window.scrollY > 100) {
+                navbar.classList.add('scrolled');
+                backToTop.style.display = 'block';
+            } else {
+                navbar.classList.remove('scrolled');
+                backToTop.style.display = 'none';
+            }
+        });
+
+        // Back to top functionality
+        document.getElementById('backToTop').addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+
+        // Add animation to booking cards
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe booking cards for animation
+        document.querySelectorAll('.booking-card').forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = `opacity 0.6s ease ${index * 0.1}s, transform 0.6s ease ${index * 0.1}s`;
+            observer.observe(card);
+        });
+    </script>
 </body>
-</html> 
+</html>

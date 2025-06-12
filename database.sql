@@ -73,18 +73,6 @@ CREATE TABLE IF NOT EXISTS bookings (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Create payments table
-CREATE TABLE IF NOT EXISTS payments (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    booking_id INT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    payment_method ENUM('cash', 'credit_card', 'mobile_money') NOT NULL,
-    status ENUM('pending', 'completed', 'failed') DEFAULT 'pending',
-    transaction_id VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
-);
-
 -- Add indexes for better performance
 CREATE INDEX idx_minibus_driver ON minibuses(driver_id);
 CREATE INDEX idx_booking_user ON bookings(user_id);

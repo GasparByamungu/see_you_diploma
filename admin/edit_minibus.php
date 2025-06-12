@@ -245,127 +245,417 @@ $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Minibus - Safari Minibus Rentals</title>
+    <title>Edit Minibus - Safari Minibus Rentals Admin</title>
+    <meta name="description" content="Edit minibus details, manage images, and assign drivers in the Safari Minibus Rentals admin panel.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
+    <style>
+        .admin-header {
+            background: var(--gradient-primary);
+            color: white;
+            padding: 2rem 0;
+            margin-top: 80px;
+        }
+
+        .form-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: none;
+            overflow: hidden;
+        }
+
+        .form-section {
+            padding: 2rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items-center;
+            gap: 0.75rem;
+        }
+
+        .image-preview {
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            transition: all var(--transition-normal);
+        }
+
+        .image-preview:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .image-preview img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .delete-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(220, 53, 69, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity var(--transition-normal);
+        }
+
+        .image-preview.marked-for-deletion .delete-overlay {
+            opacity: 1;
+        }
+
+        .driver-info-card {
+            background: var(--light-gray);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-lg);
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .status-available {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .status-maintenance {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .status-unavailable {
+            background: var(--danger-color);
+            color: white;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-light">
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg fixed-top admin-navbar" id="mainNavbar">
         <div class="container">
-            <a class="navbar-brand" href="../index.php">Safari Minibus Rentals</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand d-flex align-items-center" href="../index.php">
+                <i class="bi bi-shield-check me-2 fs-4"></i>
+                <span>Safari Admin</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="dashboard.php">Dashboard</a>
+                        <a class="nav-link" href="dashboard.php">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="minibuses.php">Minibuses</a>
+                        <a class="nav-link active" href="minibuses.php">
+                            <i class="bi bi-truck me-1"></i>Minibuses
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="drivers.php">Drivers</a>
+                        <a class="nav-link" href="drivers.php">
+                            <i class="bi bi-person-badge me-1"></i>Drivers
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="bookings.php">Bookings</a>
+                        <a class="nav-link" href="bookings.php">
+                            <i class="bi bi-calendar-check me-1"></i>Bookings
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="../logout.php">Logout</a>
+                        <a class="nav-link" href="../logout.php">
+                            <i class="bi bi-box-arrow-right me-1"></i>Logout
+                        </a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
+    <!-- Admin Header -->
+    <section class="admin-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <nav aria-label="breadcrumb" class="mb-3">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="dashboard.php" class="text-white text-decoration-none">
+                                    <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a href="minibuses.php" class="text-white text-decoration-none">
+                                    <i class="bi bi-truck me-1"></i>Minibuses
+                                </a>
+                            </li>
+                            <li class="breadcrumb-item active text-white" aria-current="page">
+                                Edit Minibus
+                            </li>
+                        </ol>
+                    </nav>
+                    <h1 class="display-6 fw-bold mb-3">
+                        <i class="bi bi-pencil-square me-3"></i>Edit Minibus
+                    </h1>
+                    <p class="lead mb-0">
+                        Update minibus details, manage images, and assign drivers
+                    </p>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <div class="d-flex flex-column align-items-lg-end">
+                        <h4 class="mb-2"><?php echo htmlspecialchars($minibus['name']); ?></h4>
+                        <span class="status-badge status-<?php echo $minibus['status']; ?>">
+                            <i class="bi bi-<?php echo $minibus['status'] === 'available' ? 'check-circle' : ($minibus['status'] === 'maintenance' ? 'tools' : 'x-circle'); ?> me-1"></i>
+                            <?php echo ucfirst($minibus['status']); ?>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Edit Minibus Form -->
-    <div class="container my-5">
+    <div class="container py-5">
         <div class="row">
-            <div class="col-md-8 mx-auto">
-                <div class="card">
-                    <div class="card-body">
-                        <h2 class="text-center mb-4">Edit Minibus</h2>
-                        
-                        <?php if (isset($_SESSION['success_message'])): ?>
-                            <div class="alert alert-success">
-                                <?php 
-                                echo $_SESSION['success_message'];
-                                unset($_SESSION['success_message']);
-                                ?>
-                            </div>
-                        <?php endif; ?>
+            <div class="col-lg-10 mx-auto">
+                <?php if (isset($_SESSION['success_message'])): ?>
+                    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <div>
+                            <?php
+                            echo htmlspecialchars($_SESSION['success_message']);
+                            unset($_SESSION['success_message']);
+                            ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
 
-                        <!-- Display error message if any -->
-                        <?php if (isset($_SESSION['error_message'])): ?>
-                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                <?php 
-                                echo $_SESSION['error_message'];
-                                unset($_SESSION['error_message']);
-                                ?>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        <?php endif; ?>
+                <?php if (isset($_SESSION['error_message'])): ?>
+                    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-start mb-4" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <?php
+                            echo htmlspecialchars($_SESSION['error_message']);
+                            unset($_SESSION['error_message']);
+                            ?>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
 
-                        <form action="" method="POST" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <label for="name" class="form-label">Name</label>
-                                <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($minibus['name']); ?>" required>
-                            </div>
+                <div class="form-card">
 
-                            <div class="mb-3">
-                                <label for="capacity" class="form-label">Capacity (passengers)</label>
-                                <input type="number" class="form-control" id="capacity" name="capacity" value="<?php echo htmlspecialchars($minibus['capacity']); ?>" required>
-                            </div>
+                    <form action="" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <!-- Basic Information Section -->
+                        <div class="form-section">
+                            <h4 class="section-title">
+                                <i class="bi bi-info-circle"></i>Basic Information
+                            </h4>
 
-                            <div class="mb-3">
-                                <label for="price_per_km" class="form-label">Price per 1km (TZS)</label>
-                                <input type="number" class="form-control" id="price_per_km" name="price_per_km" value="<?php echo htmlspecialchars($minibus['price_per_km']); ?>" required>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="status" class="form-label">Status</label>
-                                <select class="form-select" id="status" name="status" required>
-                                    <option value="available" <?php echo $minibus['status'] === 'available' ? 'selected' : ''; ?>>Available</option>
-                                    <option value="maintenance" <?php echo $minibus['status'] === 'maintenance' ? 'selected' : ''; ?>>Maintenance</option>
-                                    <option value="unavailable" <?php echo $minibus['status'] === 'unavailable' ? 'selected' : ''; ?>>Unavailable</option>
-                                </select>
-                            </div>
-
-                            <!-- Driver Selection -->
-                            <div class="mb-3">
-                                <?php if ($minibus['driver_id']): ?>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="remove_driver" name="remove_driver">
-                                    <label class="form-check-label" for="remove_driver">
-                                        Remove current driver
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label fw-semibold">
+                                        <i class="bi bi-truck me-2 text-primary"></i>Minibus Name
                                     </label>
+                                    <input type="text" class="form-control form-control-lg" id="name" name="name"
+                                           value="<?php echo htmlspecialchars($minibus['name']); ?>" required>
+                                    <div class="invalid-feedback">
+                                        Please provide a valid minibus name.
+                                    </div>
                                 </div>
-                                <?php endif; ?>
-                                <label for="edit_driver_id" class="form-label">Assign Driver</label>
-                                <select class="form-select" id="edit_driver_id" name="driver_id" <?php echo ($minibus['driver_id'] && !isset($_POST['remove_driver'])) ? 'disabled' : ''; ?>>
-                                    <option value="">Select a driver</option>
+
+                                <div class="col-md-6 mb-3">
+                                    <label for="capacity" class="form-label fw-semibold">
+                                        <i class="bi bi-people me-2 text-primary"></i>Passenger Capacity
+                                    </label>
+                                    <input type="number" class="form-control form-control-lg" id="capacity" name="capacity"
+                                           value="<?php echo htmlspecialchars($minibus['capacity']); ?>" min="1" max="50" required>
+                                    <div class="invalid-feedback">
+                                        Please provide a valid capacity (1-50 passengers).
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="price_per_km" class="form-label fw-semibold">
+                                        <i class="bi bi-currency-exchange me-2 text-primary"></i>Price per Kilometer (TZS)
+                                    </label>
+                                    <input type="number" class="form-control form-control-lg" id="price_per_km" name="price_per_km"
+                                           value="<?php echo htmlspecialchars($minibus['price_per_km']); ?>" min="100" step="50" required>
+                                    <div class="invalid-feedback">
+                                        Please provide a valid price per kilometer.
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label for="status" class="form-label fw-semibold">
+                                        <i class="bi bi-gear me-2 text-primary"></i>Status
+                                    </label>
+                                    <select class="form-select form-select-lg" id="status" name="status" required>
+                                        <option value="available" <?php echo $minibus['status'] === 'available' ? 'selected' : ''; ?>>
+                                            <i class="bi bi-check-circle"></i> Available
+                                        </option>
+                                        <option value="maintenance" <?php echo $minibus['status'] === 'maintenance' ? 'selected' : ''; ?>>
+                                            <i class="bi bi-tools"></i> Under Maintenance
+                                        </option>
+                                        <option value="unavailable" <?php echo $minibus['status'] === 'unavailable' ? 'selected' : ''; ?>>
+                                            <i class="bi bi-x-circle"></i> Unavailable
+                                        </option>
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Please select a status.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Features Section -->
+                        <div class="form-section">
+                            <h4 class="section-title">
+                                <i class="bi bi-star"></i>Features & Amenities
+                            </h4>
+
+                            <div class="mb-3">
+                                <label for="features" class="form-label fw-semibold">
+                                    <i class="bi bi-list-check me-2 text-primary"></i>Available Features
+                                </label>
+                                <input type="text" class="form-control form-control-lg" id="features" name="features"
+                                       value="<?php echo htmlspecialchars(implode(', ', $current_features)); ?>"
+                                       placeholder="e.g., Air Conditioning, WiFi, TV, Music System, Charging Ports">
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Separate multiple features with commas. These will be displayed to customers.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Driver Assignment Section -->
+                        <div class="form-section">
+                            <h4 class="section-title">
+                                <i class="bi bi-person-badge"></i>Driver Assignment
+                            </h4>
+                            <?php if ($minibus['driver_id']): ?>
+                                <div class="driver-info-card mb-4">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                                            <i class="bi bi-person fs-4 text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1 fw-bold">Currently Assigned Driver</h6>
+                                            <p class="text-muted mb-0">Active assignment</p>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-person me-2 text-primary"></i>
+                                                <div>
+                                                    <small class="text-muted">Name</small>
+                                                    <div class="fw-semibold"><?php echo htmlspecialchars($minibus['driver_name']); ?></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-telephone me-2 text-primary"></i>
+                                                <div>
+                                                    <small class="text-muted">Phone</small>
+                                                    <div class="fw-semibold"><?php echo htmlspecialchars($minibus['driver_phone']); ?></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-card-text me-2 text-primary"></i>
+                                                <div>
+                                                    <small class="text-muted">License</small>
+                                                    <div class="fw-semibold"><?php echo htmlspecialchars($minibus['driver_license']); ?></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-check mb-4">
+                                    <input class="form-check-input" type="checkbox" id="remove_driver" name="remove_driver">
+                                    <label class="form-check-label fw-semibold" for="remove_driver">
+                                        <i class="bi bi-person-x me-2 text-danger"></i>
+                                        Remove current driver assignment
+                                    </label>
+                                    <div class="form-text">
+                                        Check this box to unassign the current driver from this minibus.
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <div class="mb-3">
+                                <label for="edit_driver_id" class="form-label fw-semibold">
+                                    <i class="bi bi-person-plus me-2 text-primary"></i>Assign Driver
+                                </label>
+                                <select class="form-select form-select-lg" id="edit_driver_id" name="driver_id" <?php echo ($minibus['driver_id'] && !isset($_POST['remove_driver'])) ? 'disabled' : ''; ?>>
+                                    <option value="">Select a driver (optional)</option>
                                     <?php foreach ($drivers as $driver): ?>
                                         <option value="<?php echo $driver['id']; ?>" <?php echo ($minibus['driver_id'] == $driver['id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($driver['name'] . ' (' . $driver['license_number'] . ')'); ?>
+                                            <?php echo htmlspecialchars($driver['name'] . ' - ' . $driver['phone'] . ' (License: ' . $driver['license_number'] . ')'); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Only available drivers are shown. Assigned drivers can be reassigned.
+                                </div>
                             </div>
+                        </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Current Images</label>
-                                <div class="row">
+                        <!-- Image Management Section -->
+                        <div class="form-section">
+                            <h4 class="section-title">
+                                <i class="bi bi-images"></i>Image Gallery
+                            </h4>
+
+                            <?php if (!empty($images)): ?>
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">
+                                    <i class="bi bi-collection me-2 text-primary"></i>Current Images
+                                </label>
+                                <div class="row g-3">
                                     <?php foreach ($images as $image): ?>
-                                    <div class="col-md-4 mb-3">
-                                        <div class="card">
-                                            <img src="../<?php echo htmlspecialchars($image['image_path']); ?>" class="card-img-top" alt="Minibus Image">
-                                            <div class="card-body">
+                                    <div class="col-lg-4 col-md-6">
+                                        <div class="image-preview" id="image_<?php echo $image['id']; ?>">
+                                            <img src="../<?php echo htmlspecialchars($image['image_path']); ?>" alt="Minibus Image">
+                                            <div class="delete-overlay">
+                                                <i class="bi bi-trash fs-1 text-white"></i>
+                                            </div>
+                                            <div class="position-absolute top-0 end-0 m-2">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="delete_images[]" value="<?php echo $image['id']; ?>" id="delete_<?php echo $image['id']; ?>">
-                                                    <label class="form-check-label" for="delete_<?php echo $image['id']; ?>">
-                                                        Delete
+                                                    <input class="form-check-input" type="checkbox" name="delete_images[]"
+                                                           value="<?php echo $image['id']; ?>" id="delete_<?php echo $image['id']; ?>"
+                                                           onchange="toggleDeleteOverlay(<?php echo $image['id']; ?>)">
+                                                    <label class="form-check-label visually-hidden" for="delete_<?php echo $image['id']; ?>">
+                                                        Delete Image
                                                     </label>
                                                 </div>
                                             </div>
@@ -373,38 +663,119 @@ $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
-                            </div>
-
-                            <?php if (count($images) < 3): ?>
-                            <div class="mb-3">
-                                <label for="images" class="form-label">Add New Images</label>
-                                <input type="file" class="form-control" id="images" name="images[]" multiple accept="image/*">
-                                <small class="text-muted">You can select multiple images. Maximum file size: 5MB. Allowed formats: JPG, JPEG, PNG. Maximum 3 images total.</small>
-                                <small class="text-muted d-block">You can add <?php echo 3 - count($images); ?> more image(s).</small>
-                            </div>
-                            <?php else: ?>
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle"></i> Maximum number of images (3) reached. Delete some images to add new ones.
+                                <div class="form-text mt-2">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Check the boxes on images you want to delete. Changes will be applied when you save.
+                                </div>
                             </div>
                             <?php endif; ?>
 
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">Update Minibus</button>
-                                <a href="minibuses.php" class="btn btn-secondary">Cancel</a>
+                            <?php if (count($images) < 3): ?>
+                            <div class="mb-3">
+                                <label for="images" class="form-label fw-semibold">
+                                    <i class="bi bi-cloud-upload me-2 text-primary"></i>Add New Images
+                                </label>
+                                <input type="file" class="form-control form-control-lg" id="images" name="images[]"
+                                       multiple accept="image/*">
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    You can select multiple images. Maximum file size: 5MB per image.
+                                    Allowed formats: JPG, JPEG, PNG. You can add <?php echo 3 - count($images); ?> more image(s).
+                                </div>
                             </div>
-                        </form>
-                    </div>
+                            <?php else: ?>
+                            <div class="alert alert-warning d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <div>
+                                    Maximum number of images (3) reached. Delete some images above to add new ones.
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="form-section">
+                            <div class="d-flex flex-column flex-sm-row gap-3 justify-content-end">
+                                <a href="minibuses.php" class="btn btn-outline-secondary btn-lg">
+                                    <i class="bi bi-arrow-left me-2"></i>Cancel
+                                </a>
+                                <button type="submit" class="btn btn-primary btn-lg" id="updateBtn">
+                                    <i class="bi bi-check-circle me-2"></i>Update Minibus
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="admin-footer">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="mb-0">
+                        &copy; <?php echo date('Y'); ?> Safari Minibus Rentals Admin Panel. All rights reserved.
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">
+                        <a href="dashboard.php" class="me-3">Dashboard</a>
+                        <a href="../index.php" class="me-3">View Site</a>
+                        <a href="../logout.php">Logout</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Back to Top Button -->
+    <button type="button" class="btn btn-primary position-fixed bottom-0 end-0 m-4 rounded-circle" id="backToTop" style="width: 50px; height: 50px; display: none; z-index: 1000;">
+        <i class="bi bi-arrow-up"></i>
+    </button>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('mainNavbar');
+            const backToTop = document.getElementById('backToTop');
+
+            if (window.scrollY > 100) {
+                navbar.classList.add('scrolled');
+                backToTop.style.display = 'block';
+            } else {
+                navbar.classList.remove('scrolled');
+                backToTop.style.display = 'none';
+            }
+        });
+
+        // Back to top functionality
+        document.getElementById('backToTop').addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+
+        // Image delete overlay toggle
+        function toggleDeleteOverlay(imageId) {
+            const checkbox = document.getElementById('delete_' + imageId);
+            const imagePreview = document.getElementById('image_' + imageId);
+
+            if (checkbox.checked) {
+                imagePreview.classList.add('marked-for-deletion');
+            } else {
+                imagePreview.classList.remove('marked-for-deletion');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Driver assignment functionality
             const removeDriverCheckbox = document.getElementById('remove_driver');
             const driverSelect = document.getElementById('edit_driver_id');
-            
+
             if (removeDriverCheckbox) {
                 removeDriverCheckbox.addEventListener('change', function() {
                     if (this.checked) {
@@ -419,15 +790,78 @@ $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 });
             }
 
-            // Add event listener for driver selection
-            if (driverSelect) {
-                driverSelect.addEventListener('change', function() {
-                    // Only enable the dropdown if a driver is selected
-                    if (this.value) {
-                        driverSelect.disabled = false;
+            // Form validation
+            const form = document.querySelector('.needs-validation');
+            if (form) {
+                form.addEventListener('submit', function(event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    } else {
+                        // Add loading state to submit button
+                        const submitBtn = document.getElementById('updateBtn');
+                        const originalText = submitBtn.innerHTML;
+                        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Updating...';
+                        submitBtn.disabled = true;
+
+                        // Re-enable button after 10 seconds in case of error
+                        setTimeout(() => {
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                        }, 10000);
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            }
+
+            // File input validation
+            const fileInput = document.getElementById('images');
+            if (fileInput) {
+                fileInput.addEventListener('change', function() {
+                    const files = this.files;
+                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+
+                        if (file.size > maxSize) {
+                            alert(`File "${file.name}" is too large. Maximum size is 5MB.`);
+                            this.value = '';
+                            return;
+                        }
+
+                        if (!allowedTypes.includes(file.type)) {
+                            alert(`File "${file.name}" is not a valid image type. Only JPG, JPEG, and PNG are allowed.`);
+                            this.value = '';
+                            return;
+                        }
                     }
                 });
             }
+
+            // Add animation to form sections
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+
+            // Observe form sections for animation
+            document.querySelectorAll('.form-section').forEach((section, index) => {
+                section.style.opacity = '0';
+                section.style.transform = 'translateY(30px)';
+                section.style.transition = `opacity 0.6s ease ${index * 0.1}s, transform 0.6s ease ${index * 0.1}s`;
+                observer.observe(section);
+            });
         });
     </script>
 </body>
