@@ -11,7 +11,7 @@ require_once 'config/database.php';
     <meta name="description" content="Learn about Safari Minibus Rentals - Tanzania's premier transportation service. Our mission, values, and commitment to excellence.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
 </head>
 <body>
     <!-- Navigation -->
@@ -446,23 +446,16 @@ require_once 'config/database.php';
                 if (entry.isIntersecting) {
                     const statNumbers = entry.target.querySelectorAll('.stat-number');
                     statNumbers.forEach(number => {
-                        const finalValue = parseInt(number.textContent.replace(/[^\d]/g, ''));
-                        if (finalValue && !number.classList.contains('animated')) {
+                        if (!number.classList.contains('animated')) {
                             number.classList.add('animated');
-                            let currentValue = 0;
-                            const increment = finalValue / 50;
-
-                            const timer = setInterval(() => {
-                                currentValue += increment;
-                                if (currentValue >= finalValue) {
-                                    number.textContent = number.textContent; // Keep original format
-                                    clearInterval(timer);
-                                } else {
-                                    number.textContent = Math.floor(currentValue) + (number.textContent.includes('+') ? '+' : '');
-                                }
-                            }, 30);
+                            // Simplified animation - just add a CSS class instead of complex JS
+                            number.style.transform = 'scale(1.1)';
+                            setTimeout(() => {
+                                number.style.transform = 'scale(1)';
+                            }, 300);
                         }
                     });
+                    observer.unobserve(entry.target); // Stop observing once animated
                 }
             });
         }, observerOptions);

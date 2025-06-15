@@ -17,8 +17,41 @@ if (isset($_POST['delete_driver'])) {
     exit();
 }
 
-// Get all drivers
-$drivers = $pdo->query("SELECT * FROM drivers ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+// Pagination for drivers
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 15; // Show 15 drivers per page
+$offset = ($page - 1) * $limit;
+
+// Get total count for pagination
+$total_count = $pdo->query("SELECT COUNT(*) FROM drivers")->fetchColumn();
+$total_pages = ceil($total_count / $limit);
+
+// Get drivers with pagination
+$stmt = $pdo->prepare("SELECT * FROM drivers ORDER BY created_at DESC LIMIT ? OFFSET ?");
+$stmt->execute([$limit, $offset]);
+$drivers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Add driver
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_driver'])) {
+    $name = trim($_POST['name']);
+    $license_number = trim($_POST['license_number']);
+    $phone = trim($_POST['phone']);
+    $status = $_POST['status'];
+
+    if (empty($name) || empty($license_number) || empty($phone)) {
+        $error = "Please fill in all required fields";
+    } elseif (!preg_match('/^\+255[0-9]{9}$/', $phone)) {
+        $error = "Phone number must start with +255 followed by exactly 9 digits";
+    } else {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO drivers (name, license_number, phone, status) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$name, $license_number, $phone, $status]);
+            $success = "Driver added successfully";
+        } catch (PDOException $e) {
+            $error = "Error adding driver: " . $e->getMessage();
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,6 +88,26 @@ $drivers = $pdo->query("SELECT * FROM drivers ORDER BY created_at DESC")->fetchA
         .status-available { background-color: var(--success); }
         .status-assigned { background-color: var(--warning); }
         .status-off { background-color: var(--danger); }
+        /* Table scroll styles */
+        .table-responsive {
+            max-height: calc(100vh - 250px);
+            overflow-y: auto;
+        }
+        /* Custom scrollbar styles */
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+        }
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -122,14 +175,13 @@ $drivers = $pdo->query("SELECT * FROM drivers ORDER BY created_at DESC")->fetchA
                 </div>
             </div>
         </div>
-
-        <!-- Driver Statistics -->
+        <!-- Statistics Cards -->
         <div class="row mb-4">
             <div class="col-md-3 mb-3">
                 <div class="card bg-primary text-white">
                     <div class="card-body text-center">
                         <i class="bi bi-people display-6 mb-2"></i>
-                        <h4><?php echo count($drivers); ?></h4>
+                        <h4><?php echo $total_count; ?></h4>
                         <small>Total Drivers</small>
                     </div>
                 </div>
@@ -162,115 +214,104 @@ $drivers = $pdo->query("SELECT * FROM drivers ORDER BY created_at DESC")->fetchA
                 </div>
             </div>
         </div>
-
-        <!-- Drivers Table -->
-        <div class="card border-0 shadow-custom">
-            <div class="card-header bg-white border-0 py-4">
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 text-primary">
-                        <i class="bi bi-list-ul me-2"></i>Driver Team
-                    </h4>
-                    <div class="d-flex gap-2">
-                        <div class="input-group" style="width: 250px;">
-                            <span class="input-group-text"><i class="bi bi-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Search drivers..." id="searchInput">
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-custom">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <?php if (empty($drivers)): ?>
+                            <div class="text-center py-5">
+                                <i class="bi bi-person-badge display-1 text-muted mb-3"></i>
+                                <h5 class="text-muted">No Drivers Found</h5>
+                                <p class="text-muted">Start building your team by adding your first driver.</p>
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDriverModal">
+                                    <i class="bi bi-person-plus me-2"></i>Add First Driver
+                                </button>
+                            </div>
+                            <?php else: ?>
+                            <table class="table table-hover mb-0" id="driversTable">
+                                <thead>
+                                    <tr>
+                                        <th class="border-0 py-3">Driver</th>
+                                        <th class="border-0 py-3">License Info</th>
+                                        <th class="border-0 py-3">Contact</th>
+                                        <th class="border-0 py-3">Status</th>
+                                        <th class="border-0 py-3">Joined</th>
+                                        <th class="border-0 py-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($drivers as $driver): ?>
+                                    <tr class="driver-row">
+                                        <td class="py-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="driver-avatar me-3">
+                                                    <?php echo strtoupper(substr($driver['name'], 0, 2)); ?>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-semibold text-primary"><?php echo htmlspecialchars($driver['name']); ?></div>
+                                                    <small class="text-muted">ID: #<?php echo str_pad($driver['id'], 3, '0', STR_PAD_LEFT); ?></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3">
+                                            <div>
+                                                <div class="fw-semibold">
+                                                    <i class="bi bi-card-text me-1 text-primary"></i>
+                                                    <?php echo htmlspecialchars($driver['license_number']); ?>
+                                                </div>
+                                                <small class="text-muted">License Number</small>
+                                            </div>
+                                        </td>
+                                        <td class="py-3">
+                                            <div>
+                                                <div class="fw-semibold">
+                                                    <i class="bi bi-telephone me-1 text-primary"></i>
+                                                    <?php echo htmlspecialchars($driver['phone']); ?>
+                                                </div>
+                                                <small class="text-muted">Phone Number</small>
+                                            </div>
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="status-indicator status-<?php echo $driver['status']; ?>"></span>
+                                            <span class="badge bg-<?php
+                                                echo $driver['status'] == 'available' ? 'success' :
+                                                    ($driver['status'] == 'assigned' ? 'warning' : 'danger');
+                                            ?> px-3 py-2">
+                                                <i class="bi bi-<?php
+                                                    echo $driver['status'] == 'available' ? 'check-circle' :
+                                                        ($driver['status'] == 'assigned' ? 'person-check' : 'person-x');
+                                                ?> me-1"></i>
+                                                <?php echo ucfirst($driver['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="py-3">
+                                            <div class="text-muted">
+                                                <?php echo date('M d, Y', strtotime($driver['created_at'])); ?>
+                                            </div>
+                                        </td>
+                                        <td class="py-3">
+                                            <div class="d-flex gap-1">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        onclick="editDriver(<?php echo htmlspecialchars(json_encode($driver)); ?>)"
+                                                        title="Edit Driver">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        onclick="deleteDriver(<?php echo $driver['id']; ?>)"
+                                                        title="Delete Driver">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="card-body p-0">
-                <?php if (empty($drivers)): ?>
-                <div class="text-center py-5">
-                    <i class="bi bi-person-badge display-1 text-muted mb-3"></i>
-                    <h5 class="text-muted">No Drivers Found</h5>
-                    <p class="text-muted">Start building your team by adding your first driver.</p>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDriverModal">
-                        <i class="bi bi-person-plus me-2"></i>Add First Driver
-                    </button>
-                </div>
-                <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="driversTable">
-                        <thead>
-                            <tr>
-                                <th class="border-0 py-3">Driver</th>
-                                <th class="border-0 py-3">License Info</th>
-                                <th class="border-0 py-3">Contact</th>
-                                <th class="border-0 py-3">Status</th>
-                                <th class="border-0 py-3">Joined</th>
-                                <th class="border-0 py-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($drivers as $driver): ?>
-                            <tr class="driver-row">
-                                <td class="py-3">
-                                    <div class="d-flex align-items-center">
-                                        <div class="driver-avatar me-3">
-                                            <?php echo strtoupper(substr($driver['name'], 0, 2)); ?>
-                                        </div>
-                                        <div>
-                                            <div class="fw-semibold text-primary"><?php echo htmlspecialchars($driver['name']); ?></div>
-                                            <small class="text-muted">ID: #<?php echo str_pad($driver['id'], 3, '0', STR_PAD_LEFT); ?></small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-3">
-                                    <div>
-                                        <div class="fw-semibold">
-                                            <i class="bi bi-card-text me-1 text-primary"></i>
-                                            <?php echo htmlspecialchars($driver['license_number']); ?>
-                                        </div>
-                                        <small class="text-muted">License Number</small>
-                                    </div>
-                                </td>
-                                <td class="py-3">
-                                    <div>
-                                        <div class="fw-semibold">
-                                            <i class="bi bi-telephone me-1 text-primary"></i>
-                                            <?php echo htmlspecialchars($driver['phone']); ?>
-                                        </div>
-                                        <small class="text-muted">Phone Number</small>
-                                    </div>
-                                </td>
-                                <td class="py-3">
-                                    <span class="status-indicator status-<?php echo $driver['status']; ?>"></span>
-                                    <span class="badge bg-<?php
-                                        echo $driver['status'] == 'available' ? 'success' :
-                                            ($driver['status'] == 'assigned' ? 'warning' : 'danger');
-                                    ?> px-3 py-2">
-                                        <i class="bi bi-<?php
-                                            echo $driver['status'] == 'available' ? 'check-circle' :
-                                                ($driver['status'] == 'assigned' ? 'person-check' : 'person-x');
-                                        ?> me-1"></i>
-                                        <?php echo ucfirst($driver['status']); ?>
-                                    </span>
-                                </td>
-                                <td class="py-3">
-                                    <div class="text-muted">
-                                        <?php echo date('M d, Y', strtotime($driver['created_at'])); ?>
-                                    </div>
-                                </td>
-                                <td class="py-3">
-                                    <div class="d-flex gap-1">
-                                        <button class="btn btn-sm btn-outline-primary"
-                                                onclick="editDriver(<?php echo htmlspecialchars(json_encode($driver)); ?>)"
-                                                title="Edit Driver">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger"
-                                                onclick="deleteDriver(<?php echo $driver['id']; ?>)"
-                                                title="Delete Driver">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -290,12 +331,13 @@ $drivers = $pdo->query("SELECT * FROM drivers ORDER BY created_at DESC")->fetchA
                             <input type="text" class="form-control" id="name" name="name" required>
                         </div>
                         <div class="mb-3">
-                            <label for="license_number" class="form-label">License Number</label>
-                            <input type="text" class="form-control" id="license_number" name="license_number" required>
+                            <label for="phone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" pattern="^\+255[0-9]{9}$" maxlength="13" required>
+                            <div class="form-text">Enter phone number in +255XXXXXXXXX format.</div>
                         </div>
                         <div class="mb-3">
-                            <label for="phone" class="form-label">Phone Number</label>
-                            <input type="tel" class="form-control" id="phone" name="phone" required>
+                            <label for="license_number" class="form-label">License Number</label>
+                            <input type="text" class="form-control" id="license_number" name="license_number" required>
                         </div>
                         <div class="mb-3">
                             <label for="status" class="form-label">Status</label>
@@ -430,18 +472,33 @@ $drivers = $pdo->query("SELECT * FROM drivers ORDER BY created_at DESC")->fetchA
             });
         });
 
-        // Phone number formatting
+        // Phone number formatting and validation
         document.querySelectorAll('input[type="tel"]').forEach(input => {
             input.addEventListener('input', function() {
-                // Remove non-numeric characters except +
                 let value = this.value.replace(/[^\d+]/g, '');
-
-                // Ensure it starts with + for international format
-                if (value && !value.startsWith('+')) {
-                    value = '+255' + value;
+                
+                // Always ensure it starts with +255
+                if (!value.startsWith('+255')) {
+                    value = '+255' + value.replace('+255', '');
                 }
-
+                
+                // Limit to exactly 13 characters (+255 + 9 digits)
+                if (value.length > 13) {
+                    value = value.substring(0, 13);
+                }
+                
                 this.value = value;
+                
+                // Validate the format
+                const isValid = /^\+255[0-9]{9}$/.test(value);
+                this.setCustomValidity(isValid ? '' : 'Phone number must start with +255 followed by exactly 9 digits');
+                
+                // Log validation status for debugging
+                console.log('Phone validation:', {
+                    value: value,
+                    isValid: isValid,
+                    length: value.length
+                });
             });
         });
     </script>

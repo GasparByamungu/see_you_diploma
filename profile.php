@@ -25,8 +25,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $new_password = $_POST['new_password'];
     $confirm_password = $_POST['confirm_password'];
 
+    // Debug information for phone validation
+    $debug_info = "Phone number validation:";
+    $debug_info .= "\nInput value: '" . $phone . "'";
+    $debug_info .= "\nLength: " . strlen($phone);
+    $debug_info .= "\nPattern match result: " . (preg_match('/^\+255[0-9]{8,9}$/', $phone) ? 'true' : 'false');
+    
+    if (!preg_match('/^\+255[0-9]{8,9}$/', $phone)) {
+        $error_message = "Phone number must start with +255 followed by 8-9 digits. Debug: " . $debug_info;
+    }
     // Validate current password if changing password
-    if (!empty($new_password)) {
+    elseif (!empty($new_password)) {
         if (!password_verify($current_password, $user['password'])) {
             $error_message = "Current password is incorrect";
         } elseif ($new_password !== $confirm_password) {
@@ -62,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="description" content="Manage your Safari Minibus Rentals profile, update personal information, and change your password.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
 </head>
 <body class="bg-light">
     <!-- Navigation -->
@@ -199,10 +208,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <label for="phone" class="form-label fw-semibold">
                                     <i class="bi bi-telephone me-2 text-primary"></i>Phone Number
                                 </label>
-                                <input type="tel" class="form-control form-control-lg" id="phone" name="phone"
-                                       value="<?php echo htmlspecialchars($user['phone']); ?>" required>
+                                <input type="tel" class="form-control form-control-lg" id="phone" name="phone" 
+                                       value="<?php echo htmlspecialchars($user['phone']); ?>" 
+                                       pattern="^\+255[0-9]{8,9}$" required>
                                 <div class="invalid-feedback">
-                                    Please provide your phone number.
+                                    Please provide a valid phone number starting with +255 followed by 8-9 digits.
                                 </div>
                             </div>
 

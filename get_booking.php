@@ -4,9 +4,7 @@ require_once 'config/database.php';
 
 header('Content-Type: application/json');
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// Error reporting disabled for performance
 
 try {
     // Check if user is logged in
@@ -23,18 +21,21 @@ try {
     
     // Get booking details with related information
     $stmt = $pdo->prepare("
-        SELECT b.*, 
-               m.name as minibus_name, m.capacity,
-               d.name as driver_name, d.phone as driver_phone,
-               u.name as user_name, u.phone as user_phone
+        SELECT 
+            b.*,
+            m.name as minibus_name,
+            d.name as driver_name,
+            d.phone as driver_phone,
+            b.pickup_location,
+            b.pickup_latitude,
+            b.pickup_longitude
         FROM bookings b
-        JOIN minibuses m ON b.minibus_id = m.id
+        LEFT JOIN minibuses m ON b.minibus_id = m.id
         LEFT JOIN drivers d ON m.driver_id = d.id
-        JOIN users u ON b.user_id = u.id
-        WHERE b.id = ? AND b.user_id = ?
+        WHERE b.id = ?
     ");
     
-    $stmt->execute([$booking_id, $_SESSION['user_id']]);
+    $stmt->execute([$booking_id]);
     $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$booking) {
@@ -51,9 +52,8 @@ try {
     echo json_encode(['success' => true, 'booking' => $booking]);
 
 } catch (Exception $e) {
-    error_log('Error in get_booking.php: ' . $e->getMessage());
     echo json_encode([
-        'success' => false, 
+        'success' => false,
         'message' => $e->getMessage()
     ]);
-} 
+}

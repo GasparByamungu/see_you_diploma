@@ -21,10 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Start transaction
         $pdo->beginTransaction();
 
-        // Update booking status
+        // Update booking status and timestamp
         $stmt = $pdo->prepare("
             UPDATE bookings 
-            SET status = ?
+            SET status = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
         $stmt->execute([$status, $booking_id]);
@@ -63,4 +64,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 } else {
     header("Location: bookings.php");
     exit();
-} 
+}

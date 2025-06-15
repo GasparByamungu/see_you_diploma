@@ -43,7 +43,7 @@ $success_message = '';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    error_log('Form submitted: ' . print_r($_POST, true));
+    // Form submitted (debug removed for performance)
     try {
         // Validate required fields
         $required_fields = [
@@ -203,10 +203,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="description" content="Book your <?php echo htmlspecialchars($minibus['name']); ?> minibus rental with Safari Minibus Rentals. Easy booking process with interactive map selection.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
     <style>
         .booking-summary {
             background: var(--gradient-secondary);
@@ -648,6 +649,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-control:invalid + .invalid-feedback {
             display: block;
         }
+
+        .leaflet-routing-container {
+            display: none;
+        }
+        .leaflet-routing-alternatives-container {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -924,21 +932,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <label for="pickup_time" class="form-label fw-semibold">
                                             <i class="bi bi-clock me-2 text-primary"></i>Pickup Time
                                         </label>
-                                        <select class="form-select form-select-lg" id="pickup_time" name="pickup_time" required>
-                                            <option value="">Select Time</option>
-                                            <?php
-                                            for ($hour = 6; $hour < 22; $hour++) {
-                                                $time24 = sprintf("%02d:00", $hour);
-                                                $time12 = date('g:i A', strtotime($time24));
-                                                echo "<option value='$time24'>$time12</option>";
-
-                                                $time24_30 = sprintf("%02d:30", $hour);
-                                                $time12_30 = date('g:i A', strtotime($time24_30));
-                                                echo "<option value='$time24_30'>$time12_30</option>";
-                                            }
-                                            ?>
+                                        <select class="form-select form-select-lg" id="pickup_time" name="pickup_time" required style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+                                            <option value="" disabled selected>Select pickup time</option>
                                         </select>
-                                        <small class="text-muted">Available 6:00 AM - 10:00 PM</small>
+                                        <small class="text-muted">Choose your preferred pickup time</small>
                                     </div>
                                 </div>
 
@@ -990,50 +987,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
 
                                 <div class="booking-summary">
-                                    <h3>
-                                        <i class="bi bi-receipt me-2"></i>Booking Summary
-                                    </h3>
+                                    <h3>Booking Summary</h3>
                                     <div class="summary-item">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-calendar-date me-2"></i>
-                                            <span>Pickup Date:</span>
-                                        </div>
-                                        <span id="summary_pickup_date" class="fw-bold">Not selected</span>
+                                        <strong>Pickup Date:</strong>
+                                        <span id="summary_pickup_date"></span>
                                     </div>
                                     <div class="summary-item">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-clock me-2"></i>
-                                            <span>Pickup Time:</span>
-                                        </div>
-                                        <span id="summary_pickup_time" class="fw-bold">Not selected</span>
+                                        <strong>Pickup Time:</strong>
+                                        <span id="summary_pickup_time"></span>
                                     </div>
                                     <div class="summary-item">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-geo-alt me-2"></i>
-                                            <span>Route:</span>
-                                        </div>
-                                        <span id="summary_pickup_location" class="fw-bold">Select locations</span>
+                                        <strong>Route:</strong>
+                                        <span id="summary_pickup_location"></span>
                                     </div>
                                     <div class="summary-item">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-rulers me-2"></i>
-                                            <span>Distance:</span>
-                                        </div>
-                                        <span id="summary_route_distance" class="fw-bold">0 km</span>
+                                        <strong>Route Distance:</strong>
+                                        <span id="summary_route_distance"></span>
                                     </div>
                                     <div class="summary-item">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-stopwatch me-2"></i>
-                                            <span>Duration:</span>
-                                        </div>
-                                        <span id="summary_route_duration" class="fw-bold">0 minutes</span>
+                                        <strong>Estimated Duration:</strong>
+                                        <span id="summary_route_duration"></span>
                                     </div>
                                     <div class="summary-item total">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-calculator me-2"></i>
-                                            <span>Total Amount:</span>
-                                        </div>
-                                        <span id="summary_total_price" class="fw-bold fs-4">TZS 0</span>
+                                        <strong>Total Price:</strong>
+                                        <span id="summary_total_price"></span>
                                     </div>
                                 </div>
 
@@ -1118,460 +1095,188 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <i class="bi bi-arrow-up"></i>
     </button>
 
-    <!-- Add required JavaScript libraries -->
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
     <script>
-        // Navbar scroll effect
-        window.addEventListener('scroll', function() {
-            const navbar = document.getElementById('mainNavbar');
-            const backToTop = document.getElementById('backToTop');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Show loading indicator
+        const loadingIndicator = document.querySelector('.map-loading');
+        loadingIndicator.style.display = 'flex';
 
-            if (window.scrollY > 100) {
-                navbar.classList.add('scrolled');
-                backToTop.style.display = 'block';
-            } else {
-                navbar.classList.remove('scrolled');
-                backToTop.style.display = 'none';
-            }
+        // Initialize map with optimized options
+        const routeMap = L.map('routeMap', {
+            center: [-6.7924, 39.2083],
+            zoom: 13,
+            zoomControl: true,
+            attributionControl: true,
+            preferCanvas: true, // Use canvas renderer for better performance
+            maxZoom: 18,
+            minZoom: 5
         });
 
-        // Back to top functionality
-        document.getElementById('backToTop').addEventListener('click', function() {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
+        // Add tile layer with optimized options
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18,
+            minZoom: 5,
+            subdomains: 'abc', // Use multiple subdomains for better performance
+            updateWhenIdle: true, // Only update tiles when map is idle
+            updateWhenZooming: false // Don't update tiles while zooming
+        }).addTo(routeMap);
+
+        // Initialize markers with optimized icons
+        const pickupMarker = L.marker([-6.7924, 39.2083], {
+            draggable: true,
+            icon: L.divIcon({
+                className: 'pickup-marker',
+                html: '<i class="fas fa-map-marker-alt"></i>',
+                iconSize: [30, 30]
+            })
+        }).addTo(routeMap);
+
+        const dropoffMarker = L.marker([-6.7924, 39.2083], {
+            draggable: true,
+            icon: L.divIcon({
+                className: 'dropoff-marker',
+                html: '<i class="fas fa-map-marker-alt"></i>',
+                iconSize: [30, 30]
+            })
+        }).addTo(routeMap);
+
+        // Initialize routing control with optimized options
+        const routingControl = L.Routing.control({
+            waypoints: [],
+            routeWhileDragging: false, // Disable route calculation while dragging for better performance
+            show: true,
+            addWaypoints: false,
+            draggableWaypoints: false,
+            lineOptions: {
+                styles: [{ color: '#007bff', weight: 4, opacity: 0.8 }]
+            },
+            createMarker: function() { return null; },
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                timeout: 15000, // Reduced timeout
+                profile: 'driving'
+            }),
+            useZoomParameter: true,
+            showAlternatives: false,
+            fitSelectedRoutes: true
+        }).addTo(routeMap);
+
+        // Hide loading indicator when map is ready
+        routeMap.whenReady(function() {
+            loadingIndicator.style.display = 'none';
         });
 
-        // Form validation and enhancement
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add loading state to form submission
-            const bookingForm = document.getElementById('bookingForm');
-            if (bookingForm) {
-                bookingForm.addEventListener('submit', function(e) {
-                    const submitBtn = this.querySelector('button[type="submit"]');
-                    const originalText = submitBtn.innerHTML;
-
-                    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Processing Booking...';
-                    submitBtn.disabled = true;
-
-                    // Re-enable button after 10 seconds in case of error
-                    setTimeout(() => {
-                        submitBtn.innerHTML = originalText;
-                        submitBtn.disabled = false;
-                    }, 10000);
+        // Add debouncing to marker drag events
+        let dragTimeout;
+        pickupMarker.on('dragend', function(e) {
+            clearTimeout(dragTimeout);
+            dragTimeout = setTimeout(() => {
+                const latlng = e.target.getLatLng();
+                document.getElementById('pickup_latitude').value = latlng.lat;
+                document.getElementById('pickup_longitude').value = latlng.lng;
+                getAddressFromCoordinates(latlng, true).then(() => {
+                    updateRoute();
+                    updateBookingSummary();
                 });
-            }
+            }, 100);
+        });
 
-            // Update booking summary when form fields change
-            function updateBookingSummary() {
-                const startDate = document.getElementById('start_date').value;
-                const pickupTime = document.getElementById('pickup_time').value;
-                const routeDistance = document.getElementById('route_distance').value;
-                const pricePerKm = document.getElementById('price_per_km').value;
+        dropoffMarker.on('dragend', function(e) {
+            clearTimeout(dragTimeout);
+            dragTimeout = setTimeout(() => {
+                const latlng = e.target.getLatLng();
+                document.getElementById('dropoff_latitude').value = latlng.lat;
+                document.getElementById('dropoff_longitude').value = latlng.lng;
+                getAddressFromCoordinates(latlng, false).then(() => {
+                    updateRoute();
+                    updateBookingSummary();
+                });
+            }, 100);
+        });
 
-                // Update summary display
-                document.getElementById('summary_pickup_date').textContent = startDate ? new Date(startDate).toLocaleDateString() : 'Not selected';
-                document.getElementById('summary_pickup_time').textContent = pickupTime || 'Not selected';
-
-                if (routeDistance && pricePerKm) {
-                    const totalPrice = Math.ceil(parseFloat(routeDistance) * parseFloat(pricePerKm));
-                    document.getElementById('summary_total_price').textContent = 'TZS ' + totalPrice.toLocaleString();
-                    document.getElementById('total_price').value = totalPrice;
-                } else {
-                    document.getElementById('summary_total_price').textContent = 'TZS 0';
-                }
-            }
-
-            // Add event listeners for form fields
-            ['start_date', 'pickup_time'].forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.addEventListener('change', updateBookingSummary);
-                }
-            });
-
-            // Initialize map
-            const routeMap = L.map('routeMap').setView([-6.7924, 39.2083], 13);
-
-            // Add tile layer
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(routeMap);
-
-            // Add markers with custom icons
-            const pickupMarker = L.marker([-6.7924, 39.2083], {
-                draggable: true,
-                icon: L.divIcon({
-                    className: 'pickup-marker',
-                    html: '<i class="fas fa-map-marker-alt"></i><span class="marker-label">Pickup</span>',
-                    iconSize: [40, 40]
-                })
-            }).addTo(routeMap);
-
-            const dropoffMarker = L.marker([-6.7924, 39.2083], {
-                draggable: true,
-                icon: L.divIcon({
-                    className: 'dropoff-marker',
-                    html: '<i class="fas fa-map-marker-alt"></i><span class="marker-label">Dropoff</span>',
-                    iconSize: [40, 40]
-                })
-            }).addTo(routeMap);
-
-            // Add custom styles for markers
-            const style = document.createElement('style');
-            style.textContent = `
-                .pickup-marker {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    background: none;
-                    border: none;
-                }
-                
-                .dropoff-marker {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    background: none;
-                    border: none;
-                }
-                
-                .pickup-marker i {
-                    color: #007bff;
-                    font-size: 32px;
-                    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
-                }
-                
-                .dropoff-marker i {
-                    color: #28a745;
-                    font-size: 32px;
-                    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
-                }
-                
-                .marker-label {
-                    background: white;
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: bold;
-                    margin-top: 4px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                }
-                
-                .pickup-marker .marker-label {
-                    color: #007bff;
-                }
-                
-                .dropoff-marker .marker-label {
-                    color: #28a745;
-                }
-            `;
-            document.head.appendChild(style);
-
-            // Add geocoder with event handlers
-            const geocoder = L.Control.geocoder({
-                defaultMarkGeocode: false,
-                geocoder: L.Control.Geocoder.nominatim({
-                    geocodingQueryParams: {
-                        countrycodes: 'tz',
-                        limit: 5
-                    }
-                })
-            }).addTo(routeMap);
-
-            // Add event handlers for map control buttons
-            let currentMode = 'pickup';
-            const pickupBtn = document.getElementById('pickupLocationBtn');
-            const dropoffBtn = document.getElementById('dropoffLocationBtn');
-
-            pickupBtn.addEventListener('click', function() {
-                currentMode = 'pickup';
-                pickupBtn.classList.add('active');
-                dropoffBtn.classList.remove('active');
-            });
-
-            dropoffBtn.addEventListener('click', function() {
-                currentMode = 'dropoff';
-                dropoffBtn.classList.add('active');
-                pickupBtn.classList.remove('active');
-            });
-
-            // Add click handler for the map
-            routeMap.on('click', function(e) {
+        // Add debouncing to map click events
+        let clickTimeout;
+        routeMap.on('click', function(e) {
+            clearTimeout(clickTimeout);
+            clickTimeout = setTimeout(() => {
                 const latlng = e.latlng;
+                const isPickup = !document.getElementById('pickup_location').value;
                 
-                if (currentMode === 'pickup') {
-                    updatePickupLocation(latlng);
-                } else if (currentMode === 'dropoff') {
-                    updateDropoffLocation(latlng);
-                }
-            });
-
-            // Handle geocoder results
-            geocoder.on('markgeocode', function(e) {
-                const latlng = e.geocode.center;
-                const address = e.geocode.name;
-                
-                if (currentMode === 'pickup') {
-                    updatePickupLocation(latlng);
-                } else if (currentMode === 'dropoff') {
-                    updateDropoffLocation(latlng);
-                }
-            });
-
-            // Initialize routing control with a different service
-            const routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(-6.7924, 39.2083),
-                    L.latLng(-6.7924, 39.2083)
-                ],
-                routeWhileDragging: true,
-                lineOptions: {
-                    styles: [
-                        { color: '#007bff', weight: 4, opacity: 0.7 }
-                    ]
-                },
-                createMarker: function() { return null; },
-                router: L.Routing.osrmv1({
-                    serviceUrl: 'https://routing.openstreetmap.de/routed-car/route/v1',
-                    timeout: 30000,
-                    profile: 'driving'
-                }),
-                show: false,
-                addWaypoints: false,
-                draggableWaypoints: false,
-                fitSelectedRoutes: true,
-                showAlternatives: false
-            }).addTo(routeMap);
-
-            // Handle routing events
-            routingControl.on('routesfound', function(e) {
-                console.log('Route found:', e.routes);
-                const routes = e.routes;
-                if (routes && routes.length > 0) {
-                    const route = routes[0];
-                    const distance = route.summary.totalDistance / 1000; // Convert to km
-                    const duration = Math.ceil(route.summary.totalTime / 60); // Convert to minutes
-                    
-                    console.log('Distance:', distance, 'km');
-                    console.log('Duration:', duration, 'minutes');
-                    
-                    document.getElementById('route_distance').value = distance.toFixed(2);
-                    document.getElementById('route_duration').value = duration;
-                    
-                    const pricePerKm = parseFloat(document.getElementById('price_per_km').value);
-                    const totalPrice = Math.ceil(distance * pricePerKm);
-                    const finalPrice = Math.max(totalPrice, 10000);
-                    
-                    document.getElementById('total_price').value = finalPrice.toFixed(2);
-                    updateBookingSummary();
-                }
-            });
-
-            // Add error handling for routing
-            routingControl.on('routingerror', function(e) {
-                console.error('Routing error:', e);
-                const pickupLat = parseFloat(document.getElementById('pickup_latitude').value);
-                const pickupLng = parseFloat(document.getElementById('pickup_longitude').value);
-                const dropoffLat = parseFloat(document.getElementById('dropoff_latitude').value);
-                const dropoffLng = parseFloat(document.getElementById('dropoff_longitude').value);
-                
-                if (!isNaN(pickupLat) && !isNaN(pickupLng) && !isNaN(dropoffLat) && !isNaN(dropoffLng)) {
-                    const distance = calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
-                    const duration = Math.ceil(distance * 2);
-                    
-                    document.getElementById('route_distance').value = distance.toFixed(2);
-                    document.getElementById('route_duration').value = duration;
-                    
-                    const pricePerKm = parseFloat(document.getElementById('price_per_km').value);
-                    const totalPrice = Math.ceil(distance * pricePerKm);
-                    const finalPrice = Math.max(totalPrice, 10000);
-                    
-                    document.getElementById('total_price').value = finalPrice.toFixed(2);
-                    updateBookingSummary();
-                }
-            });
-
-            // Function to update booking summary
-            function updateBookingSummary() {
-                const pickupDate = document.getElementById('start_date').value;
-                const pickupTime = document.getElementById('pickup_time').value;
-                const pickupLocation = document.getElementById('pickupLocationDisplay').textContent;
-                const dropoffLocation = document.getElementById('dropoffLocationDisplay').textContent;
-                const distance = document.getElementById('route_distance').value;
-                const duration = document.getElementById('route_duration').value;
-                const totalPrice = document.getElementById('total_price').value;
-                
-                // Format the date
-                const formattedDate = new Date(pickupDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                
-                // Format the time
-                const [hours, minutes] = pickupTime.split(':');
-                const formattedTime = new Date().setHours(hours, minutes);
-                const timeString = new Date(formattedTime).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
-                
-                // Update the summary elements
-                document.getElementById('summary_pickup_date').textContent = formattedDate;
-                document.getElementById('summary_pickup_time').textContent = timeString;
-                document.getElementById('summary_pickup_location').textContent = `From: ${pickupLocation} To: ${dropoffLocation}`;
-                document.getElementById('summary_route_distance').textContent = `${distance} km`;
-                document.getElementById('summary_route_duration').textContent = `${duration} minutes`;
-                document.getElementById('summary_total_price').textContent = `TZS ${parseFloat(totalPrice).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            }
-
-            // Function to update pickup location
-            function updatePickupLocation(latlng) {
-                const latInput = document.getElementById('pickup_latitude');
-                const lngInput = document.getElementById('pickup_longitude');
-                const locationInput = document.getElementById('pickup_location');
-                const locationDisplay = document.getElementById('pickupLocationDisplay');
-                
-                latInput.value = latlng.lat;
-                lngInput.value = latlng.lng;
-                pickupMarker.setLatLng(latlng);
-                
-                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const address = formatAddress(data);
-                        locationInput.value = address;
-                        locationDisplay.textContent = address;
+                if (isPickup) {
+                    document.getElementById('pickup_latitude').value = latlng.lat;
+                    document.getElementById('pickup_longitude').value = latlng.lng;
+                    pickupMarker.setLatLng(latlng);
+                    getAddressFromCoordinates(latlng, true).then(() => {
                         updateRoute();
-                    })
-                    .catch(error => {
-                        console.error('Error getting address:', error);
-                        const coords = `${latlng.lat}, ${latlng.lng}`;
-                        locationInput.value = coords;
-                        locationDisplay.textContent = coords;
-                        updateRoute();
-                    });
-            }
-
-            // Function to update dropoff location
-            function updateDropoffLocation(latlng) {
-                const latInput = document.getElementById('dropoff_latitude');
-                const lngInput = document.getElementById('dropoff_longitude');
-                const locationInput = document.getElementById('dropoff_location');
-                const locationDisplay = document.getElementById('dropoffLocationDisplay');
-                
-                latInput.value = latlng.lat;
-                lngInput.value = latlng.lng;
-                dropoffMarker.setLatLng(latlng);
-                
-                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const address = formatAddress(data);
-                        locationInput.value = address;
-                        locationDisplay.textContent = address;
-                        updateRoute();
-                    })
-                    .catch(error => {
-                        console.error('Error getting address:', error);
-                        const coords = `${latlng.lat}, ${latlng.lng}`;
-                        locationInput.value = coords;
-                        locationDisplay.textContent = coords;
-                        updateRoute();
-                    });
-            }
-
-            // Function to update route
-            function updateRoute() {
-                const pickupLat = parseFloat(document.getElementById('pickup_latitude').value);
-                const pickupLng = parseFloat(document.getElementById('pickup_longitude').value);
-                const dropoffLat = parseFloat(document.getElementById('dropoff_latitude').value);
-                const dropoffLng = parseFloat(document.getElementById('dropoff_longitude').value);
-                
-                if (!isNaN(pickupLat) && !isNaN(pickupLng) && !isNaN(dropoffLat) && !isNaN(dropoffLng) &&
-                    (pickupLat !== -6.7924 || pickupLng !== 39.2083) &&
-                    (dropoffLat !== -6.7924 || dropoffLng !== 39.2083)) {
-                    
-                    try {
-                        // Clear existing route
-                        routingControl.setWaypoints([]);
-                        
-                        // Set new waypoints
-                        routingControl.setWaypoints([
-                            L.latLng(pickupLat, pickupLng),
-                            L.latLng(dropoffLat, dropoffLng)
-                        ]);
-                        
-                        // Fallback calculation after 5 seconds if routing fails
-                        setTimeout(() => {
-                            if (document.getElementById('route_distance').value === '0') {
-                                const distance = calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
-                                const duration = Math.ceil(distance * 2);
-                                
-                                document.getElementById('route_distance').value = distance.toFixed(2);
-                                document.getElementById('route_duration').value = duration;
-                                
-                                const pricePerKm = parseFloat(document.getElementById('price_per_km').value);
-                                const totalPrice = Math.ceil(distance * pricePerKm);
-                                const finalPrice = Math.max(totalPrice, 10000);
-                                
-                                document.getElementById('total_price').value = finalPrice.toFixed(2);
-                                updateBookingSummary();
-                            }
-                        }, 5000);
-                        
-                    } catch (error) {
-                        console.error('Error updating route:', error);
-                        // Use direct distance calculation as fallback
-                        const distance = calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
-                        const duration = Math.ceil(distance * 2);
-                        
-                        document.getElementById('route_distance').value = distance.toFixed(2);
-                        document.getElementById('route_duration').value = duration;
-                        
-                        const pricePerKm = parseFloat(document.getElementById('price_per_km').value);
-                        const totalPrice = Math.ceil(distance * pricePerKm);
-                        const finalPrice = Math.max(totalPrice, 10000);
-                        
-                        document.getElementById('total_price').value = finalPrice.toFixed(2);
                         updateBookingSummary();
-                    }
+                    });
+                } else {
+                    document.getElementById('dropoff_latitude').value = latlng.lat;
+                    document.getElementById('dropoff_longitude').value = latlng.lng;
+                    dropoffMarker.setLatLng(latlng);
+                    getAddressFromCoordinates(latlng, false).then(() => {
+                        updateRoute();
+                        updateBookingSummary();
+                    });
                 }
-            }
-
-            // Handle marker drag
-            pickupMarker.on('dragend', function(e) {
-                updatePickupLocation(e.target.getLatLng());
-            });
-
-            dropoffMarker.on('dragend', function(e) {
-                updateDropoffLocation(e.target.getLatLng());
-            });
-
-            // Hide loading indicator when map is ready
-            routeMap.whenReady(function() {
-                document.querySelector('.map-loading').style.display = 'none';
-            });
-
-            // Add event listeners for date and time changes
-            document.getElementById('start_date').addEventListener('change', updateBookingSummary);
-            document.getElementById('pickup_time').addEventListener('change', updateBookingSummary);
-
-            // Initial update of booking summary
-            updateBookingSummary();
-
+            }, 100);
         });
 
+        // Function to update booking summary
+        function updateBookingSummary() {
+            const pickupDate = document.getElementById('start_date').value;
+            const pickupTime = document.getElementById('pickup_time').value;
+            const pickupLocation = document.getElementById('pickupLocationDisplay').textContent;
+            const dropoffLocation = document.getElementById('dropoffLocationDisplay').textContent;
+            const distance = document.getElementById('route_distance').value;
+            const duration = document.getElementById('route_duration').value;
+            const totalPrice = document.getElementById('total_price').value;
+            
+            // Update summary elements
+            document.getElementById('summary_pickup_date').textContent = new Date(pickupDate).toLocaleDateString();
+            document.getElementById('summary_pickup_time').textContent = pickupTime;
+            document.getElementById('summary_pickup_location').textContent = `From: ${pickupLocation} To: ${dropoffLocation}`;
+            document.getElementById('summary_route_distance').textContent = `${distance} km`;
+            document.getElementById('summary_route_duration').textContent = `${duration} minutes`;
+            document.getElementById('summary_total_price').textContent = `TZS ${parseFloat(totalPrice).toLocaleString()}`;
+        }
+
+        // Function to update route
+        function updateRoute() {
+            const pickupLat = parseFloat(document.getElementById('pickup_latitude').value);
+            const pickupLng = parseFloat(document.getElementById('pickup_longitude').value);
+            const dropoffLat = parseFloat(document.getElementById('dropoff_latitude').value);
+            const dropoffLng = parseFloat(document.getElementById('dropoff_longitude').value);
+            
+            if (!isNaN(pickupLat) && !isNaN(pickupLng) && !isNaN(dropoffLat) && !isNaN(dropoffLng) &&
+                (pickupLat !== -6.7924 || pickupLng !== 39.2083) &&
+                (dropoffLat !== -6.7924 || dropoffLng !== 39.2083)) {
+                
+                try {
+                    routingControl.setWaypoints([
+                        L.latLng(pickupLat, pickupLng),
+                        L.latLng(dropoffLat, dropoffLng)
+                    ]);
+                } catch (error) {
+                    console.error('Error updating route:', error);
+                }
+            }
+        }
+
+        // Add event listeners for date and time changes
+        document.getElementById('start_date').addEventListener('change', updateBookingSummary);
+        document.getElementById('pickup_time').addEventListener('change', updateBookingSummary);
+
+        // Initial update of booking summary
+        updateBookingSummary();
+
+        // Function to calculate direct distance (fallback)
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; // Radius of the earth in km
             const dLat = deg2rad(lat2 - lat1);
@@ -1588,75 +1293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function deg2rad(deg) {
             return deg * (Math.PI/180);
         }
-
-        // Add form validation
-        function validateForm() {
-            const pickupDate = document.getElementById('start_date').value;
-            const pickupTime = document.getElementById('pickup_time').value;
-            const pickupLocation = document.getElementById('pickup_location').value;
-            const dropoffLocation = document.getElementById('dropoff_location').value;
-            const routeDistance = document.getElementById('route_distance').value;
-            
-            let isValid = true;
-            let errorMessage = '';
-
-            if (!pickupDate) {
-                errorMessage += 'Please select a pickup date.\n';
-                isValid = false;
-            }
-
-            if (!pickupTime) {
-                errorMessage += 'Please select a pickup time.\n';
-                isValid = false;
-            }
-
-            if (!pickupLocation || pickupLocation === 'Dar es Salaam, Tanzania') {
-                errorMessage += 'Please select a specific pickup location on the map.\n';
-                isValid = false;
-            }
-
-            if (!dropoffLocation) {
-                errorMessage += 'Please select a dropoff location on the map.\n';
-                isValid = false;
-            }
-
-            if (!routeDistance || routeDistance === '0') {
-                errorMessage += 'Please set both pickup and dropoff locations to calculate the route.\n';
-                isValid = false;
-            }
-
-            if (!isValid) {
-                alert(errorMessage);
-                return false;
-            }
-
-            // Show loading state
-            const submitButton = document.querySelector('button[type="submit"]');
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-            submitButton.disabled = true;
-
-            return true;
-        }
-
-        // Add event listener to form
-        document.getElementById('bookingForm').addEventListener('submit', function(e) {
-            if (!validateForm()) {
-                e.preventDefault();
-            }
-        });
-
-        function formatAddress(data) {
-            let formattedAddress = '';
-            if (data.address) {
-                const addr = data.address;
-                if (addr.road) formattedAddress += addr.road;
-                if (addr.suburb) formattedAddress += (formattedAddress ? ', ' : '') + addr.suburb;
-                if (addr.city) formattedAddress += (formattedAddress ? ', ' : '') + addr.city;
-                if (addr.state) formattedAddress += (formattedAddress ? ', ' : '') + addr.state;
-                if (addr.country) formattedAddress += (formattedAddress ? ', ' : '') + addr.country;
-            }
-            return formattedAddress || data.display_name;
-        }
+    });
     </script>
 </body>
-</html> 
+</html>

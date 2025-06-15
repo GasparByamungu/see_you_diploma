@@ -8,18 +8,36 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     exit();
 }
 
-// Get all bookings with related information
-$stmt = $pdo->query("
-    SELECT b.*, 
+// Pagination settings
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 100; // Show 100 bookings per page
+$offset = ($page - 1) * $limit;
+
+// Get total count for pagination
+$total_count = $pdo->query("SELECT COUNT(*) FROM bookings")->fetchColumn();
+$total_pages = ceil($total_count / $limit);
+
+// Get bookings with pagination
+$stmt = $pdo->prepare("
+    SELECT b.*,
            u.name as user_name, u.phone as user_phone,
            m.name as minibus_name, m.capacity,
-           d.name as driver_name, d.phone as driver_phone
+           d.name as driver_name, d.phone as driver_phone,
+           DATE_FORMAT(b.pickup_time, '%H:%i') as formatted_pickup_time,
+           DATE_FORMAT(b.created_at, '%Y-%m-%d %H:%i') as formatted_created_at,
+           DATE_FORMAT(b.updated_at, '%Y-%m-%d %H:%i') as formatted_updated_at,
+           CASE 
+               WHEN b.reschedule_request = 1 THEN 'Rescheduled'
+               ELSE b.status 
+           END as display_status
     FROM bookings b
     JOIN users u ON b.user_id = u.id
     JOIN minibuses m ON b.minibus_id = m.id
     LEFT JOIN drivers d ON m.driver_id = d.id
-    ORDER BY b.created_at DESC
+    ORDER BY b.updated_at DESC, b.created_at DESC
+    LIMIT ? OFFSET ?
 ");
+$stmt->execute([$limit, $offset]);
 $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -31,7 +49,7 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta name="description" content="Admin panel for managing customer bookings, confirming reservations, and tracking booking status.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="../assets/css/style.css?v=1.0">
     <style>
         .booking-card {
             transition: all var(--transition-normal);
@@ -135,18 +153,25 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <p class="text-muted mb-0">Monitor and manage customer bookings, confirmations, and reservations</p>
                     </div>
                     <div class="d-flex gap-2">
-                        <div class="input-group" style="width: 250px;">
-                            <span class="input-group-text"><i class="bi bi-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Search bookings..." id="searchInput">
-                        </div>
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                        </button>
+                        
                     </div>
                 </div>
             </div>
         </div>
+        <!-- Display session messages -->
+        <?php if (isset($_SESSION['success_message'])): ?>
+            <div class="alert alert-success"><?php echo $_SESSION['success_message']; unset($_SESSION['success_message']); ?></div>
+        <?php endif; ?>
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="alert alert-danger"><?php echo $_SESSION['error_message']; unset($_SESSION['error_message']); ?></div>
+        <?php endif; ?>
 
         <!-- Booking Statistics -->
         <div class="row mb-4">
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="card bg-primary text-white">
                     <div class="card-body text-center">
                         <i class="bi bi-calendar-event display-6 mb-2"></i>
@@ -155,7 +180,7 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="card bg-warning text-white">
                     <div class="card-body text-center">
                         <i class="bi bi-clock display-6 mb-2"></i>
@@ -164,7 +189,7 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
                 <div class="card bg-success text-white">
                     <div class="card-body text-center">
                         <i class="bi bi-check-circle display-6 mb-2"></i>
@@ -173,172 +198,120 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body text-center">
-                        <i class="bi bi-currency-exchange display-6 mb-2"></i>
-                        <h4>
-                            <?php
-                            $totalRevenue = array_sum(array_column(array_filter($bookings, fn($b) => $b['status'] === 'confirmed'), 'total_price'));
-                            echo number_format($totalRevenue/1000, 0) . 'K';
-                            ?>
-                        </h4>
-                        <small>Revenue (TZS)</small>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- Bookings List -->
-        <div class="card border-0 shadow-custom">
-            <div class="card-header bg-white border-0 py-4">
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 text-primary">
-                        <i class="bi bi-list-ul me-2"></i>All Bookings
-                    </h4>
-                    <div class="d-flex gap-2">
-                        <select class="form-select" id="statusFilter" style="width: 150px;">
-                            <option value="">All Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="completed">Completed</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <?php if (empty($bookings)): ?>
-                <div class="text-center py-5">
-                    <i class="bi bi-calendar-x display-1 text-muted mb-3"></i>
-                    <h5 class="text-muted">No Bookings Found</h5>
-                    <p class="text-muted">Customer bookings will appear here when they make reservations.</p>
-                </div>
-                <?php else: ?>
+        <!-- Bookings Table -->
+        <div class="card">
+            <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="bookingsTable">
+                    <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th class="border-0 py-3">Booking</th>
-                                <th class="border-0 py-3">Customer</th>
-                                <th class="border-0 py-3">Vehicle</th>
-                                <th class="border-0 py-3">Schedule</th>
-                                <th class="border-0 py-3">Amount</th>
-                                <th class="border-0 py-3">Status</th>
-                                <th class="border-0 py-3">Actions</th>
+                                <th>ID</th>
+                                <th>Customer</th>
+                                <th>Minibus</th>
+                                <th>Driver</th>
+                                <th>Dates</th>
+                                <th>Pickup</th>
+                                <th>Total Price</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($bookings as $booking): ?>
-                            <tr class="booking-row booking-status-<?php echo $booking['status']; ?>" data-status="<?php echo $booking['status']; ?>">
-                                <td class="py-3">
-                                    <div class="d-flex align-items-center">
-                                        <div class="bg-primary-light rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                            <i class="bi bi-calendar-check text-primary"></i>
-                                        </div>
-                                        <div>
-                                            <div class="fw-semibold">#<?php echo str_pad($booking['id'], 4, '0', STR_PAD_LEFT); ?></div>
-                                            <small class="text-muted"><?php echo date('M d, Y', strtotime($booking['created_at'])); ?></small>
-                                        </div>
-                                    </div>
+                            <tr>
+                                <td><?php echo $booking['id']; ?></td>
+                                <td>
+                                    <?php echo htmlspecialchars($booking['user_name']); ?><br>
+                                    <small class="text-muted"><?php echo htmlspecialchars($booking['user_phone']); ?></small>
                                 </td>
-                                <td class="py-3">
-                                    <div class="d-flex align-items-center">
-                                        <div class="customer-avatar me-3">
-                                            <?php echo strtoupper(substr($booking['user_name'], 0, 2)); ?>
-                                        </div>
-                                        <div>
-                                            <div class="fw-semibold"><?php echo htmlspecialchars($booking['user_name']); ?></div>
-                                            <small class="text-muted">
-                                                <i class="bi bi-telephone me-1"></i><?php echo htmlspecialchars($booking['user_phone']); ?>
-                                            </small>
-                                        </div>
-                                    </div>
+                                <td>
+                                    <?php echo htmlspecialchars($booking['minibus_name']); ?><br>
+                                    <small class="text-muted"><?php echo $booking['capacity']; ?> seats</small>
                                 </td>
-                                <td class="py-3">
-                                    <div>
-                                        <div class="fw-semibold"><?php echo htmlspecialchars($booking['minibus_name']); ?></div>
-                                        <small class="text-muted">
-                                            <i class="bi bi-people me-1"></i><?php echo $booking['capacity']; ?> seats
-                                            <?php if ($booking['driver_name']): ?>
-                                                | <i class="bi bi-person me-1"></i><?php echo htmlspecialchars($booking['driver_name']); ?>
-                                            <?php endif; ?>
-                                        </small>
-                                    </div>
+                                <td>
+                                    <?php if ($booking['driver_name']): ?>
+                                        <?php echo htmlspecialchars($booking['driver_name']); ?><br>
+                                        <small class="text-muted"><?php echo htmlspecialchars($booking['driver_phone']); ?></small>
+                                    <?php else: ?>
+                                        <span class="text-muted">Not assigned</span>
+                                    <?php endif; ?>
                                 </td>
-                                <td class="py-3">
-                                    <div>
-                                        <div class="fw-semibold">
-                                            <i class="bi bi-calendar me-1"></i>
-                                            <?php echo date('M d, Y', strtotime($booking['start_date'])); ?>
-                                        </div>
-                                        <small class="text-muted">
-                                            <i class="bi bi-clock me-1"></i>
-                                            <?php echo date('h:i A', strtotime($booking['pickup_time'])); ?>
-                                        </small>
-                                    </div>
+                                <td>
+                                    <?php echo date('M d, Y', strtotime($booking['start_date'])); ?><br>
+                                    <small class="text-muted"><?php echo date('h:i A', strtotime($booking['pickup_time'])); ?></small>
                                 </td>
-                                <td class="py-3">
-                                    <div class="fw-bold text-success">
-                                        TZS <?php echo number_format($booking['total_price']); ?>
-                                    </div>
+                                <td>
+                                    <?php echo htmlspecialchars($booking['pickup_location']); ?><br>
+                                    <small class="text-muted"><?php echo date('h:i A', strtotime($booking['pickup_time'])); ?></small>
                                 </td>
-                                <td class="py-3">
-                                    <span class="status-indicator status-<?php echo $booking['status']; ?>"></span>
-                                    <span class="badge bg-<?php
-                                        echo $booking['status'] == 'confirmed' ? 'success' :
-                                            ($booking['status'] == 'pending' ? 'warning' :
-                                            ($booking['status'] == 'cancelled' ? 'danger' : 'info'));
-                                    ?> px-3 py-2">
-                                        <i class="bi bi-<?php
-                                            echo $booking['status'] == 'confirmed' ? 'check-circle' :
-                                                ($booking['status'] == 'pending' ? 'clock' :
-                                                ($booking['status'] == 'cancelled' ? 'x-circle' : 'info-circle'));
-                                        ?> me-1"></i>
+                                <td>TZS <?php echo number_format($booking['total_price']); ?></td>
+                                <td>
+                                    <span class="badge bg-<?php 
+                                        echo $booking['status'] == 'confirmed' ? 'success' : 
+                                            ($booking['status'] == 'pending' ? 'warning' : 
+                                            ($booking['status'] == 'cancelled' ? 'danger' : 'info')); 
+                                    ?>">
                                         <?php echo ucfirst($booking['status']); ?>
                                     </span>
                                 </td>
-                                <td class="py-3">
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots"></i>
+                                <td>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-sm btn-primary" 
+                                                onclick="showModal('viewBookingModal<?php echo $booking['id']; ?>')">
+                                            <i class="bi bi-eye"></i>
                                         </button>
-                                        <ul class="dropdown-menu">
-                                            <li>
-                                                <button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewBookingModal<?php echo $booking['id']; ?>">
-                                                    <i class="bi bi-eye me-2"></i>View Details
-                                                </button>
-                                            </li>
-                                            <?php if ($booking['status'] == 'pending'): ?>
-                                            <li>
-                                                <form action="update_booking.php" method="POST" class="d-inline">
-                                                    <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
-                                                    <input type="hidden" name="status" value="confirmed">
-                                                    <button type="submit" class="dropdown-item text-success" onclick="return confirm('Are you sure you want to confirm this booking?')">
-                                                        <i class="bi bi-check-circle me-2"></i>Confirm
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <li>
-                                                <form action="update_booking.php" method="POST" class="d-inline">
-                                                    <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
-                                                    <input type="hidden" name="status" value="cancelled">
-                                                    <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to cancel this booking?')">
-                                                        <i class="bi bi-x-circle me-2"></i>Cancel
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <?php endif; ?>
-                                        </ul>
+                                        <form action="update_booking.php" method="POST" class="d-inline">
+                                            <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
+                                            <input type="hidden" name="status" value="confirmed">
+                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Are you sure you want to confirm this booking?')">
+                                                <i class="bi bi-check-circle"></i> Confirm
+                                            </button>
+                                        </form>
+                                        <form action="update_booking.php" method="POST" class="d-inline">
+                                            <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
+                                            <input type="hidden" name="status" value="cancelled">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to cancel this booking?')">
+                                                <i class="bi bi-x-circle"></i> Cancel
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-                <?php endif; ?>
             </div>
         </div>
+
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Bookings pagination">
+                <ul class="pagination">
+                    <?php if ($page > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?page=<?php echo $page - 1; ?>">Previous</a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                        <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                        </li>
+                    <?php endfor; ?>
+
+                    <?php if ($page < $total_pages): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?page=<?php echo $page + 1; ?>">Next</a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Booking Detail Modals -->
@@ -485,10 +458,19 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
         });
 
-        // Auto-refresh every 2 minutes
+        // Auto-refresh every 30 seconds
         setInterval(() => {
             window.location.reload();
-        }, 120000);
+        }, 30000);
+
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'block';
+            } else {
+                console.error('Modal element not found:', modalId);
+            }
+        }
     </script>
 </body>
 </html>

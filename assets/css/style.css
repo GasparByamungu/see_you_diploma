@@ -1,5 +1,5 @@
-/* Safari Minibus Rentals - Modern UI Design */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap');
+/* Safari Minibus Rentals - Optimized UI Design */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;600&display=swap');
 
 /* CSS Variables - Safari Theme */
 :root {
@@ -91,28 +91,13 @@ p {
     color: var(--dark-gray);
 }
 
-/* Hero Section - Enhanced */
+/* Hero Section - Optimized */
 .hero-section {
-    background: var(--gradient-hero), url('../images/hero-bg.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
+    background: var(--gradient-hero);
     color: var(--white);
     padding: 120px 0 80px;
     text-align: center;
     position: relative;
-    overflow: hidden;
-}
-
-.hero-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="safari-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23safari-pattern)"/></svg>');
-    opacity: 0.3;
 }
 
 .hero-section .container {
@@ -126,7 +111,6 @@ p {
     margin-bottom: 1.5rem;
     color: var(--white);
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-    animation: fadeInUp 1s ease-out;
 }
 
 .hero-section p {
@@ -136,7 +120,6 @@ p {
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
-    animation: fadeInUp 1s ease-out 0.2s both;
 }
 
 /* Search Section - Enhanced */
@@ -1010,5 +993,26 @@ footer a:hover {
 
     .card {
         border: 2px solid var(--gray);
+    }
+}
+
+/* Optimized Animations */
+.fade-in-up {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-up.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    .fade-in-up {
+        opacity: 1;
+        transform: none;
+        transition: none;
     }
 }

@@ -9,15 +9,11 @@ if (!isset($_GET['id'])) {
 
 $id = (int)$_GET['id'];
 
-// Get minibus details with all images
+// Get minibus details
 $stmt = $pdo->prepare("
-    SELECT m.*, d.name as driver_name, d.phone as driver_phone,
-           GROUP_CONCAT(mi.image_path ORDER BY mi.display_order) as images
-    FROM minibuses m 
-    LEFT JOIN drivers d ON m.driver_id = d.id
-    LEFT JOIN minibus_images mi ON m.id = mi.minibus_id 
+    SELECT m.id, m.name, m.capacity, m.price_per_km, m.features, m.status, m.driver_id, m.created_at
+    FROM minibuses m
     WHERE m.id = ?
-    GROUP BY m.id
 ");
 $stmt->execute([$id]);
 $minibus = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -27,7 +23,32 @@ if (!$minibus) {
     exit();
 }
 
-$images = $minibus['images'] ? explode(',', $minibus['images']) : ['assets/images/default-minibus.jpg'];
+// Get driver information separately
+$minibus['driver_name'] = null;
+$minibus['driver_phone'] = null;
+if ($minibus['driver_id']) {
+    $driver_stmt = $pdo->prepare("
+        SELECT name as driver_name, phone as driver_phone
+        FROM drivers WHERE id = ?
+    ");
+    $driver_stmt->execute([$minibus['driver_id']]);
+    $driver = $driver_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($driver) {
+        $minibus['driver_name'] = $driver['driver_name'];
+        $minibus['driver_phone'] = $driver['driver_phone'];
+    }
+}
+
+// Get images separately
+$images_stmt = $pdo->prepare("
+    SELECT image_path FROM minibus_images
+    WHERE minibus_id = ?
+    ORDER BY display_order
+");
+$images_stmt->execute([$id]);
+$image_paths = $images_stmt->fetchAll(PDO::FETCH_COLUMN);
+$images = !empty($image_paths) ? $image_paths : ['assets/images/default-minibus.jpg'];
 $features = json_decode($minibus['features'] ?? '[]', true);
 ?>
 <!DOCTYPE html>
@@ -39,7 +60,7 @@ $features = json_decode($minibus['features'] ?? '[]', true);
     <meta name="description" content="View detailed information about <?php echo htmlspecialchars($minibus['name']); ?> including features, pricing, and booking options.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
     <style>
         .image-gallery {
             position: relative;

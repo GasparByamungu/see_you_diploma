@@ -19,20 +19,45 @@ $max_passengers = (int)$passenger_range[1];
 
 // Get available minibuses for the selected date and capacity
 $stmt = $pdo->prepare("
-    SELECT m.*, GROUP_CONCAT(mi.image_path ORDER BY mi.display_order) as images
-    FROM minibuses m 
-    LEFT JOIN minibus_images mi ON m.id = mi.minibus_id 
+    SELECT m.id, m.name, m.capacity, m.price_per_km, m.features, m.status, m.driver_id, m.created_at
+    FROM minibuses m
     WHERE m.capacity BETWEEN ? AND ?
     AND m.id NOT IN (
-        SELECT minibus_id 
-        FROM bookings 
-        WHERE start_date = ? 
+        SELECT minibus_id
+        FROM bookings
+        WHERE start_date = ?
         AND status != 'cancelled'
     )
-    GROUP BY m.id
+    ORDER BY m.created_at DESC
 ");
 $stmt->execute([$min_passengers, $max_passengers, $date]);
 $minibuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get images for all minibuses in one query to avoid N+1 problem
+if (!empty($minibuses)) {
+    $minibus_ids = array_column($minibuses, 'id');
+    $placeholders = str_repeat('?,', count($minibus_ids) - 1) . '?';
+    $images_stmt = $pdo->prepare("
+        SELECT minibus_id, image_path
+        FROM minibus_images
+        WHERE minibus_id IN ($placeholders)
+        ORDER BY minibus_id, display_order
+    ");
+    $images_stmt->execute($minibus_ids);
+    $all_images = $images_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Group images by minibus_id
+    $images_by_minibus = [];
+    foreach ($all_images as $img) {
+        $images_by_minibus[$img['minibus_id']][] = $img['image_path'];
+    }
+
+    // Add images to each minibus
+    foreach ($minibuses as &$minibus) {
+        $images = $images_by_minibus[$minibus['id']] ?? [];
+        $minibus['images'] = implode(',', $images);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +68,7 @@ $minibuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta name="description" content="Browse available minibuses for <?php echo date('F j, Y', strtotime($date)); ?> with capacity for <?php echo htmlspecialchars($passengers); ?> passengers.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
     <style>
         .search-summary {
             background: var(--gradient-primary);
@@ -245,240 +270,76 @@ $minibuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </section>
 
-    <!-- Search Results -->
+    <!-- Main Content -->
     <div class="container py-5">
-        <!-- Filter Section -->
-        <div class="filter-section">
-            <div class="row align-items-center">
-                <div class="col-lg-8">
-                    <h4 class="mb-3 text-primary">
-                        <i class="bi bi-funnel me-2"></i>Refine Your Search
-                    </h4>
-                    <form method="GET" action="search.php" class="row g-3">
-                        <div class="col-md-4">
-                            <label for="date" class="form-label fw-semibold">
-                                <i class="bi bi-calendar-date me-2 text-primary"></i>Travel Date
-                            </label>
-                            <input type="date" class="form-control" id="date" name="date"
-                                   value="<?php echo htmlspecialchars($date); ?>"
-                                   min="<?php echo date('Y-m-d'); ?>" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="passengers" class="form-label fw-semibold">
-                                <i class="bi bi-people me-2 text-primary"></i>Passengers
-                            </label>
-                            <select class="form-select" id="passengers" name="passengers" required>
-                                <option value="1-7" <?php echo $passengers === '1-7' ? 'selected' : ''; ?>>1-7 passengers</option>
-                                <option value="8-14" <?php echo $passengers === '8-14' ? 'selected' : ''; ?>>8-14 passengers</option>
-                                <option value="15-25" <?php echo $passengers === '15-25' ? 'selected' : ''; ?>>15-25 passengers</option>
-                                <option value="26-50" <?php echo $passengers === '26-50' ? 'selected' : ''; ?>>26+ passengers</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="bi bi-search me-2"></i>Update Search
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                <div class="col-lg-4 text-lg-end">
-                    <div class="search-stats">
-                        <div class="d-flex justify-content-lg-end justify-content-center gap-4 mt-3 mt-lg-0">
-                            <div class="text-center">
-                                <div class="fw-bold fs-4 text-primary"><?php echo count($minibuses); ?></div>
-                                <small class="text-muted">Available</small>
+        <!-- Search Results -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-custom">
+                    <div class="card-body p-4">
+                        <h4 class="mb-4">
+                            <i class="bi bi-search me-2 text-primary"></i>Search Results
+                            <?php if (!empty($date)): ?>
+                                for <?php echo date('M d, Y', strtotime($date)); ?>
+                            <?php endif; ?>
+                        </h4>
+
+                        <?php if (empty($minibuses)): ?>
+                            <div class="text-center py-5">
+                                <i class="bi bi-search display-1 text-muted mb-3"></i>
+                                <h5 class="text-muted">No Minibuses Found</h5>
+                                <p class="text-muted">Try adjusting your search criteria or browse our available minibuses.</p>
+                                <a href="index.php" class="btn btn-primary mt-3">
+                                    <i class="bi bi-house me-2"></i>Back to Home
+                                </a>
                             </div>
-                            <div class="text-center">
-                                <div class="fw-bold fs-4 text-success">
-                                    <?php echo count($minibuses) > 0 ? min(array_column($minibuses, 'price_per_km')) : '0'; ?>
-                                </div>
-                                <small class="text-muted">From TZS/km</small>
+                        <?php else: ?>
+                            <div class="row">
+                                <?php foreach ($minibuses as $minibus): ?>
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card minibus-card h-100">
+                                            <div class="row g-0">
+                                                <div class="col-md-4">
+                                                    <img src="<?php echo htmlspecialchars($minibus['images']); ?>" 
+                                                         class="img-fluid rounded-start h-100 object-fit-cover" 
+                                                         alt="<?php echo htmlspecialchars($minibus['name']); ?>">
+                                                </div>
+                                                <div class="col-md-8">
+                                                    <div class="card-body">
+                                                        <h5 class="card-title">
+                                                            <?php echo htmlspecialchars($minibus['name']); ?>
+                                                            <span class="badge bg-success float-end">
+                                                                <?php echo $minibus['capacity']; ?> seats
+                                                            </span>
+                                                        </h5>
+                                                        <div class="features mb-3">
+                                                            <?php
+                                                            $features = json_decode($minibus['features'] ?? '[]', true);
+                                                            foreach ($features as $feature): ?>
+                                                                <span class="badge bg-light text-dark me-2 mb-2">
+                                                                    <i class="bi bi-check-circle me-1 text-success"></i>
+                                                                    <?php echo htmlspecialchars($feature); ?>
+                                                                </span>
+                                                            <?php endforeach; ?>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <a href="book.php?id=<?php echo $minibus['id']; ?>&date=<?php echo urlencode($date); ?>" 
+                                                               class="btn btn-primary">
+                                                                <i class="bi bi-calendar-check me-2"></i>Book Now
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
-                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
-
-        <?php if (empty($minibuses)): ?>
-            <div class="no-results">
-                <i class="bi bi-search display-1 text-muted mb-4"></i>
-                <h3 class="text-primary mb-3">No Minibuses Available</h3>
-                <p class="text-muted mb-4 lead">
-                    We couldn't find any available minibuses for <strong><?php echo date('F j, Y', strtotime($date)); ?></strong>
-                    with capacity for <strong><?php echo htmlspecialchars($passengers); ?> passengers</strong>.
-                </p>
-                <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-                    <a href="index.php" class="btn btn-primary btn-lg">
-                        <i class="bi bi-arrow-left me-2"></i>Try Different Search
-                    </a>
-                    <a href="tel:+255683749514" class="btn btn-outline-primary btn-lg">
-                        <i class="bi bi-telephone me-2"></i>Call for Assistance
-                    </a>
-                </div>
-            </div>
-        <?php else: ?>
-            <!-- Results Header -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                        <div class="mb-3 mb-md-0">
-                            <h3 class="text-primary fw-bold mb-2">
-                                <i class="bi bi-truck me-2"></i>Available Minibuses
-                            </h3>
-                            <p class="text-muted mb-0">
-                                Showing <?php echo count($minibuses); ?> available minibus<?php echo count($minibuses) !== 1 ? 'es' : ''; ?>
-                                for your selected criteria
-                            </p>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="toggleView('grid')" id="gridViewBtn">
-                                <i class="bi bi-grid-3x3-gap me-1"></i>Grid
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="toggleView('list')" id="listViewBtn">
-                                <i class="bi bi-list me-1"></i>List
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Minibus Grid -->
-            <div class="row" id="minibusGrid">
-                <?php foreach ($minibuses as $minibus):
-                    $images = $minibus['images'] ? explode(',', $minibus['images']) : ['assets/images/default-minibus.jpg'];
-                ?>
-                <div class="col-lg-4 col-md-6 mb-4 minibus-item">
-                    <div class="card minibus-card h-100">
-                        <!-- Image Section -->
-                        <div class="position-relative">
-                            <?php if(count($images) > 1): ?>
-                            <div id="minibusCarousel<?php echo $minibus['id']; ?>" class="carousel slide" data-bs-ride="carousel">
-                                <div class="carousel-inner">
-                                    <?php foreach($images as $index => $image): ?>
-                                    <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>">
-                                        <img src="<?php echo htmlspecialchars($image); ?>"
-                                             class="card-img-top"
-                                             alt="<?php echo htmlspecialchars($minibus['name']); ?>"
-                                             style="height: 250px; object-fit: cover;">
-                                    </div>
-                                    <?php endforeach; ?>
-                                </div>
-                                <button class="carousel-control-prev" type="button" data-bs-target="#minibusCarousel<?php echo $minibus['id']; ?>" data-bs-slide="prev">
-                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Previous</span>
-                                </button>
-                                <button class="carousel-control-next" type="button" data-bs-target="#minibusCarousel<?php echo $minibus['id']; ?>" data-bs-slide="next">
-                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Next</span>
-                                </button>
-                            </div>
-                            <?php else: ?>
-                            <img src="<?php echo htmlspecialchars($images[0]); ?>"
-                                 class="card-img-top"
-                                 alt="<?php echo htmlspecialchars($minibus['name']); ?>"
-                                 style="height: 250px; object-fit: cover;">
-                            <?php endif; ?>
-
-                            <!-- Badges -->
-                            <div class="position-absolute top-0 start-0 m-3">
-                                <span class="capacity-badge">
-                                    <i class="bi bi-people me-1"></i><?php echo htmlspecialchars($minibus['capacity']); ?> seats
-                                </span>
-                            </div>
-                            <div class="position-absolute top-0 end-0 m-3">
-                                <span class="price-badge">
-                                    TZS <?php echo number_format($minibus['price_per_km']); ?>/km
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Card Body -->
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title text-primary fw-bold mb-3">
-                                <i class="bi bi-truck me-2"></i><?php echo htmlspecialchars($minibus['name']); ?>
-                            </h5>
-
-                            <div class="mb-3 flex-grow-1">
-                                <div class="row g-2 text-muted">
-                                    <div class="col-6">
-                                        <small class="d-flex align-items-center">
-                                            <i class="bi bi-people me-2"></i>
-                                            <?php echo htmlspecialchars($minibus['capacity']); ?> passengers
-                                        </small>
-                                    </div>
-                                    <div class="col-6">
-                                        <small class="d-flex align-items-center">
-                                            <i class="bi bi-shield-check me-2"></i>
-                                            Available
-                                        </small>
-                                    </div>
-                                    <div class="col-6">
-                                        <small class="d-flex align-items-center">
-                                            <i class="bi bi-geo-alt me-2"></i>
-                                            All Tanzania
-                                        </small>
-                                    </div>
-                                    <div class="col-6">
-                                        <small class="d-flex align-items-center">
-                                            <i class="bi bi-star me-2"></i>
-                                            Premium
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="d-grid gap-2">
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <a href="view_minibus.php?id=<?php echo $minibus['id']; ?>"
-                                           class="btn btn-outline-primary w-100">
-                                            <i class="bi bi-eye me-1"></i>Details
-                                        </a>
-                                    </div>
-                                    <div class="col-6">
-                                        <?php if(isset($_SESSION['user_id'])): ?>
-                                            <a href="book.php?id=<?php echo $minibus['id']; ?>&date=<?php echo urlencode($date); ?>"
-                                               class="btn btn-primary w-100">
-                                                <i class="bi bi-calendar-plus me-1"></i>Book
-                                            </a>
-                                        <?php else: ?>
-                                            <a href="login.php" class="btn btn-primary w-100">
-                                                <i class="bi bi-box-arrow-in-right me-1"></i>Login
-                                            </a>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Call to Action -->
-            <div class="row mt-5">
-                <div class="col-lg-10 mx-auto">
-                    <div class="card border-0 shadow-custom-lg" style="background: var(--gradient-secondary);">
-                        <div class="card-body p-5 text-white text-center">
-                            <h3 class="fw-bold mb-3">Need Help Choosing?</h3>
-                            <p class="mb-4 fs-5">
-                                Our travel experts are here to help you find the perfect minibus for your journey.
-                                Get personalized recommendations and special offers.
-                            </p>
-                            <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-                                <a href="tel:+255683749514" class="btn btn-light btn-lg">
-                                    <i class="bi bi-telephone me-2"></i>Call Expert: +255 683749514
-                                </a>
-                                <a href="mailto:info@safariminibus.co.tz" class="btn btn-outline-light btn-lg">
-                                    <i class="bi bi-envelope me-2"></i>Email Us
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
     </div>
 
     <!-- Footer -->

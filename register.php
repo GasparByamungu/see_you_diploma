@@ -20,22 +20,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (strlen($password) < 6) {
         $error = "Password must be at least 6 characters long";
     } else {
-        // Check if email already exists
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->rowCount() > 0) {
-            $error = "Email already registered";
+        // Debug information
+        $debug_info = "Phone number validation:";
+        $debug_info .= "\nInput value: '" . $phone . "'";
+        $debug_info .= "\nLength: " . strlen($phone);
+        $debug_info .= "\nPattern match result: " . (preg_match('/^\+255[0-9]{8,9}$/', $phone) ? 'true' : 'false');
+        
+        if (!preg_match('/^\+255[0-9]{8,9}$/', $phone)) {
+            $error = "Phone number must start with +255 followed by 8-9 digits. Debug: " . $debug_info;
         } else {
-            // Create new user
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, 'user')");
-            
-            try {
-                $stmt->execute([$name, $email, $phone, $hashed_password]);
-                $success = "Registration successful! You can now login.";
-            } catch (PDOException $e) {
-                error_log("Registration error: " . $e->getMessage());
-                $error = "Registration failed. Error: " . $e->getMessage();
+            // Check if email already exists
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->rowCount() > 0) {
+                $error = "Email already registered";
+            } else {
+                // Create new user
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, 'user')");
+                
+                try {
+                    $stmt->execute([$name, $email, $phone, $hashed_password]);
+                    $success = "Registration successful! You can now login.";
+                } catch (PDOException $e) {
+                    $error = "Registration failed. Please try again.";
+                }
             }
         }
     }
@@ -50,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="description" content="Join Safari Minibus Rentals today. Create your account to book premium minibus transportation across Tanzania.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
     <style>
         .auth-container {
             min-height: 100vh;
@@ -231,12 +240,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <input type="tel" class="form-control" id="phone" name="phone"
                                                placeholder="Phone Number"
                                                value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>"
-                                               pattern="^\+?[0-9]{10,15}$" required>
+                                               pattern="^\+255[0-9]{8,9}$" required>
                                         <label for="phone">
                                             <i class="bi bi-telephone me-2"></i>Phone Number
                                         </label>
                                         <div class="invalid-feedback">
-                                            Please provide a valid phone number.
+                                            Please provide a valid phone number starting with +255 followed by 8-9 digits.
                                         </div>
                                         <div class="form-text">
                                             <small>Include country code (e.g., +255 for Tanzania)</small>
@@ -409,16 +418,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
-            // Phone number formatting
+            // Phone number formatting and validation
             const phoneInput = document.getElementById('phone');
             phoneInput.addEventListener('input', function() {
                 let value = this.value.replace(/[^\d+]/g, '');
-
-                if (value && !value.startsWith('+')) {
-                    value = '+255' + value;
+                
+                // Always ensure it starts with +255
+                if (!value.startsWith('+255')) {
+                    value = '+255' + value.replace('+255', '');
                 }
-
+                
+                // Limit to 12-13 characters (+255 + 8-9 digits)
+                if (value.length > 13) {
+                    value = value.substring(0, 13);
+                }
+                
                 this.value = value;
+                
+                // Validate the format
+                const isValid = /^\+255[0-9]{8,9}$/.test(value);
+                this.setCustomValidity(isValid ? '' : 'Phone number must start with +255 followed by 8-9 digits');
+                
+                // Log validation status for debugging
+                console.log('Phone validation:', {
+                    value: value,
+                    isValid: isValid,
+                    length: value.length
+                });
             });
 
             // Form validation

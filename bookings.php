@@ -8,18 +8,37 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Get user's bookings with related information
+// Pagination for user bookings
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 10; // Show 10 bookings per page
+$offset = ($page - 1) * $limit;
+
+// Get total count for pagination
+$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE user_id = ?");
+$count_stmt->execute([$_SESSION['user_id']]);
+$total_count = $count_stmt->fetchColumn();
+$total_pages = ceil($total_count / $limit);
+
+// Get user's bookings with pagination
 $stmt = $pdo->prepare("
-    SELECT b.*, 
+    SELECT b.*,
            m.name as minibus_name, m.capacity,
-           d.name as driver_name, d.phone as driver_phone
+           d.name as driver_name, d.phone as driver_phone,
+           DATE_FORMAT(b.pickup_time, '%H:%i') as formatted_pickup_time,
+           DATE_FORMAT(b.created_at, '%Y-%m-%d %H:%i') as formatted_created_at,
+           DATE_FORMAT(b.updated_at, '%Y-%m-%d %H:%i') as formatted_updated_at,
+           CASE 
+               WHEN b.reschedule_request = 1 THEN 'Rescheduled'
+               ELSE b.status 
+           END as display_status
     FROM bookings b
     JOIN minibuses m ON b.minibus_id = m.id
     LEFT JOIN drivers d ON m.driver_id = d.id
     WHERE b.user_id = ?
-    ORDER BY b.created_at DESC
+    ORDER BY b.updated_at DESC, b.created_at DESC
+    LIMIT ? OFFSET ?
 ");
-$stmt->execute([$_SESSION['user_id']]);
+$stmt->execute([$_SESSION['user_id'], $limit, $offset]);
 $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -31,7 +50,7 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta name="description" content="View and manage your Safari Minibus Rentals bookings, track status, and make payments.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
     <script src="https://checkout.flutterwave.com/v3.js"></script>
     <style>
         .custom-modal {
@@ -142,24 +161,20 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
             defaultOption.textContent = 'Select pickup time';
             timeSelect.appendChild(defaultOption);
 
-            // Generate time slots for 24 hours
-            for (let hour = 0; hour < 24; hour++) {
-                for (let minute = 0; minute < 60; minute += 30) {
-                    const time = new Date();
-                    time.setHours(hour, minute, 0);
-                    
-                    const timeString = time.toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false
-                    });
+            // Pre-generated time slots for better performance
+            const timeSlots = [
+                '06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
+                '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+                '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
+                '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30'
+            ];
 
-                    const option = document.createElement('option');
-                    option.value = timeString;
-                    option.textContent = timeString;
-                    timeSelect.appendChild(option);
-                }
-            }
+            timeSlots.forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            });
         }
 
         function viewBooking(id) {
@@ -186,8 +201,8 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             modal.querySelector('#viewTotalAmount').textContent = booking.total_price;
                             modal.querySelector('#viewMinibus').textContent = booking.minibus_name;
                             modal.querySelector('#viewDriver').textContent = booking.driver_name || 'Not assigned';
-                            modal.querySelector('#viewCreatedAt').textContent = booking.created_at;
-                            modal.querySelector('#viewUpdatedAt').textContent = booking.updated_at;
+                            modal.querySelector('#viewBookingTime').textContent = booking.created_at;
+                            modal.querySelector('#viewPickupTime').textContent = booking.pickup_time;
 
                             // Show/hide cancellation reason
                             const cancelReasonDiv = modal.querySelector('#viewCancelReason');
@@ -288,6 +303,78 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 alert('Payment failed. Please try again.');
             }
         });
+
+        // Function to safely set text content
+        function setTextContent(elementId, value) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = value || 'N/A';
+            }
+        }
+
+        // Function to populate time select
+        function populateNewPickupTimeSelect() {
+            const select = document.getElementById('new_pickup_time');
+            if (!select) return;
+
+            const startHour = 0;
+            const endHour = 23;
+            const interval = 30;
+
+            for (let hour = startHour; hour <= endHour; hour++) {
+                for (let minute = 0; minute < 60; minute += interval) {
+                    const time = new Date();
+                    time.setHours(hour, minute);
+                    const option = document.createElement('option');
+                    option.value = time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                    option.textContent = option.value;
+                    select.appendChild(option);
+                }
+            }
+        }
+
+        // Function to show booking details
+        function showBookingDetails(id) {
+            fetch(`get_booking.php?id=${id}`)
+                .then(response => response.json())
+                .then(response => {
+                    if (response.success && response.booking) {
+                        const booking = response.booking;
+                        
+                        // Format pickup location with coordinates if available
+                        const pickupLocation = booking.pickup_location || 'Not specified';
+                        const pickupCoords = booking.pickup_latitude && booking.pickup_longitude 
+                            ? ` (${booking.pickup_latitude}, ${booking.pickup_longitude})`
+                            : '';
+                        
+                        // Update all booking details
+                        document.getElementById('viewBookingId').textContent = booking.id;
+                        document.getElementById('viewStatus').textContent = booking.status;
+                        document.getElementById('viewMinibus').textContent = booking.minibus_name || 'Not assigned';
+                        document.getElementById('viewDriver').textContent = booking.driver_name || 'Not assigned';
+                        document.getElementById('viewDriverContact').textContent = booking.driver_phone || 'N/A';
+                        document.getElementById('viewStartDate').textContent = booking.start_date;
+                        document.getElementById('viewPickupTime').textContent = booking.pickup_time;
+                        document.getElementById('viewPickupLocation').textContent = pickupLocation + pickupCoords;
+                        document.getElementById('viewBookingTime').textContent = booking.created_at;
+                        document.getElementById('viewTotalAmount').textContent = booking.total_price;
+
+                        // Show the modal
+                        const modal = document.getElementById('viewBookingModal');
+                        if (modal) {
+                            modal.style.display = 'block';
+                        }
+                    } else {
+                        console.error('Error:', response.message || 'Failed to load booking details');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            populateNewPickupTimeSelect();
+        });
     </script>
 </head>
 <body>
@@ -347,14 +434,24 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <h1 class="display-6 fw-bold text-primary mb-2">
                             <i class="bi bi-calendar-check me-3"></i>My Bookings
                         </h1>
-                        <p class="text-muted mb-0">Track and manage your minibus reservations</p>
+                        <p class="text-muted mb-0">View and manage your Safari Minibus Rentals bookings, track status, and make payments.</p>
                     </div>
-                    <a href="index.php" class="btn btn-primary">
-                        <i class="bi bi-plus-circle me-2"></i>New Booking
-                    </a>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- Display session messages -->
+        <?php if (isset($_SESSION['success_message'])): ?>
+            <div class="alert alert-success"><?php echo $_SESSION['success_message']; unset($_SESSION['success_message']); ?></div>
+        <?php endif; ?>
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="alert alert-danger"><?php echo $_SESSION['error_message']; unset($_SESSION['error_message']); ?></div>
+        <?php endif; ?>
 
         <?php if (empty($bookings)): ?>
             <div class="row">
@@ -522,19 +619,20 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="booking-details">
-                                                        <h5 class="mb-3">Booking Details</h5>
                                                         <div class="row">
                                                             <div class="col-md-6">
+                                                                <p><strong>Minibus:</strong> <span id="viewMinibus"></span></p>
                                                                 <p><strong>Booking ID:</strong> <span id="viewBookingId"></span></p>
                                                                 <p><strong>Status:</strong> <span id="viewStatus" class="badge"></span></p>
-                                                                <p><strong>Start Date:</strong> <span id="viewStartDate"></span></p>
+                                                                <p><strong>Booking Time:</strong> <span id="viewBookingTime"></span></p>
                                                                 <p><strong>Total Amount:</strong> TZS <span id="viewTotalAmount"></span></p>
                                                             </div>
                                                             <div class="col-md-6">
-                                                                <p><strong>Minibus:</strong> <span id="viewMinibus"></span></p>
+                                                                <p><strong>Pickup Date:</strong> <span id="viewStartDate"></span></p>
+                                                                <p><strong>Pickup Time:</strong> <span id="viewPickupTime"></span></p>
+                                                                <p><strong>Pickup Location:</strong> <span id="viewPickupLocation"></span></p>
                                                                 <p><strong>Driver:</strong> <span id="viewDriver"></span></p>
-                                                                <p><strong>Created At:</strong> <span id="viewCreatedAt"></span></p>
-                                                                <p><strong>Last Updated:</strong> <span id="viewUpdatedAt"></span></p>
+                                                                <p><strong>Driver Contact:</strong> <span id="viewDriverContact"></span></p>
                                                             </div>
                                                         </div>
                                                         <div id="viewCancelReason" class="mt-3" style="display: none;">

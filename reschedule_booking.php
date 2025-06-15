@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Get booking details
         $stmt = $pdo->prepare("
-            SELECT b.*, m.price_per_day 
+            SELECT b.*, m.price_per_km 
             FROM bookings b
             JOIN minibuses m ON b.minibus_id = m.id
             WHERE b.id = ? AND b.user_id = ? AND b.status = 'pending'
@@ -76,7 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             SET start_date = ?, 
                 pickup_time = ?,
                 status = 'pending',
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = CURRENT_TIMESTAMP,
+                reschedule_request = 1
             WHERE id = ? AND user_id = ?
         ");
         
@@ -87,16 +88,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id']
         ]);
 
-        $_SESSION['success_message'] = "Your reschedule request has been submitted and is pending approval.";
-        header("Location: bookings.php");
+        // Log the reschedule request
+        $stmt = $pdo->prepare("
+            INSERT INTO booking_logs (booking_id, action, details, created_at)
+            VALUES (?, 'reschedule_request', ?, CURRENT_TIMESTAMP)
+        ");
+        $details = json_encode([
+            'old_date' => $booking['start_date'],
+            'old_time' => $booking['pickup_time'],
+            'new_date' => $new_start_date,
+            'new_time' => $new_pickup_time
+        ]);
+        $stmt->execute([$booking_id, $details]);
+
+        // Set success message for all pages
+        $_SESSION['success_message'] = "Booking #" . $booking_id . " has been rescheduled. New date: " . date('M d, Y', strtotime($new_start_date)) . " at " . date('h:i A', strtotime($new_pickup_time));
+        
+        // Redirect based on user role
+        if ($_SESSION['user_role'] === 'admin') {
+            header("Location: admin/bookings.php");
+        } else {
+            header("Location: bookings.php");
+        }
         exit();
 
     } catch (Exception $e) {
         $_SESSION['error_message'] = $e->getMessage();
-        header("Location: bookings.php");
+        // Redirect based on user role
+        if ($_SESSION['user_role'] === 'admin') {
+            header("Location: admin/bookings.php");
+        } else {
+            header("Location: bookings.php");
+        }
         exit();
     }
 } else {
-    header("Location: bookings.php");
+    // Redirect based on user role
+    if ($_SESSION['user_role'] === 'admin') {
+        header("Location: admin/bookings.php");
+    } else {
+        header("Location: bookings.php");
+    }
     exit();
 } 

@@ -1,4 +1,6 @@
 <?php
+
+
 session_start();
 require_once 'config/database.php';
 ?>
@@ -11,7 +13,7 @@ require_once 'config/database.php';
     <meta name="description" content="Experience Tanzania with our premium minibus rental service. Comfortable, reliable, and affordable transportation for your safari adventures.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
@@ -170,112 +172,96 @@ require_once 'config/database.php';
 
         <div class="row" id="minibus-list">
             <?php
+            // Optimized query with limit for better performance
             $stmt = $pdo->query("
-                SELECT m.*, GROUP_CONCAT(mi.image_path ORDER BY mi.display_order) as images
+                SELECT m.id, m.name, m.capacity, m.price_per_km, m.features, m.status, m.created_at
                 FROM minibuses m
-                LEFT JOIN minibus_images mi ON m.id = mi.minibus_id
-                WHERE m.status = 'available'
-                GROUP BY m.id
                 ORDER BY m.created_at DESC
+                LIMIT 100
             ");
-            while($minibus = $stmt->fetch(PDO::FETCH_ASSOC)):
-                $images = $minibus['images'] ? explode(',', $minibus['images']) : ['assets/images/default-minibus.jpg'];
-                $features = json_decode($minibus['features'] ?? '[]', true);
-            ?>
-            <div class="col-lg-4 col-md-6 mb-4 fade-in-up">
-                <div class="card minibus-card h-100">
-                    <div class="position-relative">
-                        <div id="minibusCarousel<?php echo $minibus['id']; ?>" class="carousel slide" data-bs-ride="carousel">
-                            <div class="carousel-inner">
-                                <?php foreach($images as $index => $image): ?>
-                                <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>">
-                                    <img src="<?php echo htmlspecialchars($image); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($minibus['name']); ?>">
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <?php if(count($images) > 1): ?>
-                            <button class="carousel-control-prev" type="button" data-bs-target="#minibusCarousel<?php echo $minibus['id']; ?>" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Previous</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#minibusCarousel<?php echo $minibus['id']; ?>" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Next</span>
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="position-absolute top-0 end-0 m-3">
-                            <span class="capacity-badge">
-                                <i class="bi bi-people me-1"></i><?php echo $minibus['capacity']; ?> Seats
-                            </span>
-                        </div>
-                    </div>
+            $minibuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                    <div class="card-body d-flex flex-column">
-                        <h5 class="card-title mb-3">
-                            <i class="bi bi-truck me-2 text-primary"></i>
-                            <?php echo htmlspecialchars($minibus['name']); ?>
-                        </h5>
+            // Remove duplicate minibuses by id (just in case)
+            $unique_minibuses = [];
+            foreach ($minibuses as $minibus) {
+                $unique_minibuses[$minibus['id']] = $minibus;
+            }
+            $minibuses = array_values($unique_minibuses);
 
-                        <div class="price-display mb-3">
-                            <div class="d-flex align-items-center justify-content-center">
-                                <i class="bi bi-currency-exchange me-2"></i>
-                                <span>TZS <?php echo number_format($minibus['price_per_km']); ?></span>
-                                <small class="ms-1">per km</small>
-                            </div>
-                        </div>
-
-                        <?php if(!empty($features)): ?>
-                        <div class="features-list mb-3">
-                            <?php foreach(array_slice($features, 0, 4) as $feature): ?>
-                                <span class="feature-tag">
-                                    <i class="bi bi-check-circle me-1"></i><?php echo htmlspecialchars($feature); ?>
-                                </span>
-                            <?php endforeach; ?>
-                            <?php if(count($features) > 4): ?>
-                                <span class="feature-tag">
-                                    <i class="bi bi-plus-circle me-1"></i>+<?php echo count($features) - 4; ?> more
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <?php endif; ?>
-
-                        <div class="mt-auto">
-                            <div class="d-grid gap-2">
-                                <a href="view_minibus.php?id=<?php echo $minibus['id']; ?>" class="btn btn-outline-primary">
-                                    <i class="bi bi-eye me-2"></i>View Details
-                                </a>
-                                <?php if(isset($_SESSION['user_id'])): ?>
-                                    <a href="book.php?id=<?php echo $minibus['id']; ?>" class="btn btn-primary">
-                                        <i class="bi bi-calendar-plus me-2"></i>Book Now
-                                    </a>
-                                <?php else: ?>
-                                    <a href="login.php" class="btn btn-primary">
-                                        <i class="bi bi-box-arrow-in-right me-2"></i>Login to Book
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <?php endwhile; ?>
-        </div>
-
-        <?php if($pdo->query("SELECT COUNT(*) FROM minibuses WHERE status = 'available'")->fetchColumn() == 0): ?>
-        <div class="row">
-            <div class="col-12 text-center py-5">
-                <div class="card bg-light">
-                    <div class="card-body py-5">
+            if (empty($minibuses)): ?>
+                <div class="col-12">
+                    <div class="text-center py-5">
                         <i class="bi bi-truck display-1 text-muted mb-3"></i>
-                        <h3 class="text-muted">No Minibuses Available</h3>
-                        <p class="text-muted">Please check back later or contact us for availability.</p>
-                        <a href="about.php" class="btn btn-primary">Contact Us</a>
+                        <h3 class="text-muted mb-3">No Minibuses Available</h3>
+                        <p class="text-muted mb-4">Please check back later or contact us for availability.</p>
+                        <a href="contact.php" class="btn btn-primary">
+                            <i class="bi bi-envelope me-2"></i>Contact Us
+                        </a>
                     </div>
                 </div>
-            </div>
+            <?php else:
+                // Get images for all minibuses in one query
+                $minibus_ids = array_column($minibuses, 'id');
+                $placeholders = str_repeat('?,', count($minibus_ids) - 1) . '?';
+                $images_stmt = $pdo->prepare("
+                    SELECT minibus_id, image_path
+                    FROM minibus_images
+                    WHERE minibus_id IN ($placeholders)
+                    ORDER BY minibus_id, display_order
+                ");
+                $images_stmt->execute($minibus_ids);
+                $all_images = $images_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Group images by minibus_id
+                $images_by_minibus = [];
+                foreach ($all_images as $img) {
+                    $images_by_minibus[$img['minibus_id']][] = $img['image_path'];
+                }
+
+                // Add images to each minibus
+                foreach ($minibuses as &$minibus) {
+                    $images = $images_by_minibus[$minibus['id']] ?? [];
+                    $minibus['images'] = !empty($images) ? $images[0] : 'assets/images/default-minibus.jpg';
+                }
+
+                foreach ($minibuses as $minibus): ?>
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="card minibus-card h-100">
+                            <img src="<?php echo htmlspecialchars($minibus['images']); ?>" 
+                                 class="card-img-top" 
+                                 alt="<?php echo htmlspecialchars($minibus['name']); ?>"
+                                 style="height: 200px; object-fit: cover;">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <?php echo htmlspecialchars($minibus['name']); ?>
+                                    <span class="badge bg-success float-end">
+                                        <?php echo $minibus['capacity']; ?> seats
+                                    </span>
+                                </h5>
+                                <div class="features mb-3">
+                                    <?php
+                                    $features = json_decode($minibus['features'] ?? '[]', true);
+                                    foreach ($features as $feature): ?>
+                                        <span class="badge bg-light text-dark me-2 mb-2">
+                                            <i class="bi bi-check-circle me-1 text-success"></i>
+                                            <?php echo htmlspecialchars($feature); ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <a href="book.php?id=<?php echo $minibus['id']; ?>" class="btn btn-primary">
+                                        <i class="bi bi-calendar-check me-2"></i>Book Now
+                                    </a>
+                                    <a href="view_minibus.php?id=<?php echo $minibus['id']; ?>" class="btn btn-outline-secondary">
+                                        <i class="bi bi-eye me-2"></i>View Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach;
+            endif; ?>
         </div>
-        <?php endif; ?>
     </div>
 
     <!-- Footer -->
@@ -378,28 +364,47 @@ require_once 'config/database.php';
             }
         });
 
-        // Add animation on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
+        // Simplified animation on scroll (performance optimized)
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target); // Stop observing once visible
+                    }
+                });
+            }, { threshold: 0.1 });
 
-        const observer = new IntersectionObserver(function(entries) {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }
+            // Observe only visible elements
+            document.querySelectorAll('.fade-in-up').forEach(element => {
+                observer.observe(element);
             });
-        }, observerOptions);
 
-        // Observe all fade-in-up elements
-        document.querySelectorAll('.fade-in-up').forEach(el => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(30px)';
-            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-            observer.observe(el);
-        });
+            // Lazy loading for images
+            const lazyImageObserver = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        img.src = img.dataset.src;
+                        img.classList.remove('lazy-load');
+                        lazyImageObserver.unobserve(img);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.lazy-load').forEach(img => {
+                lazyImageObserver.observe(img);
+            });
+        }
+
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'block';
+            } else {
+                console.error('Modal element not found:', modalId);
+            }
+        }
     </script>
 </body>
 </html>

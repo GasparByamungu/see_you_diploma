@@ -7,11 +7,12 @@ CREATE TABLE IF NOT EXISTS users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    phone VARCHAR(20) NOT NULL,
+    phone VARCHAR(13) NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'user') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_phone CHECK (phone REGEXP '^\\+255[0-9]{9}$' AND LENGTH(phone) = 13)
 );
 
 -- Create drivers table
@@ -19,16 +20,17 @@ CREATE TABLE IF NOT EXISTS drivers (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     license_number VARCHAR(50) UNIQUE NOT NULL,
-    phone VARCHAR(20) NOT NULL,
+    phone VARCHAR(13) NOT NULL,
     status ENUM('available', 'assigned', 'off') DEFAULT 'available',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_phone CHECK (phone REGEXP '^\\+255[0-9]{9}$' AND LENGTH(phone) = 13)
 );
 
 -- Create minibuses table
 CREATE TABLE IF NOT EXISTS minibuses (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     capacity INT NOT NULL,
     price_per_km DECIMAL(10,2) NOT NULL,
     features JSON DEFAULT NULL,
@@ -67,10 +69,22 @@ CREATE TABLE IF NOT EXISTS bookings (
     total_price DECIMAL(10,2) NOT NULL,
     notes TEXT,
     status ENUM('pending', 'confirmed', 'completed', 'cancelled') DEFAULT 'pending',
+    cancellation_reason TEXT,
+    reschedule_request TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (minibus_id) REFERENCES minibuses(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Create booking_logs table for tracking changes
+CREATE TABLE IF NOT EXISTS booking_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
 -- Add indexes for better performance
@@ -82,6 +96,8 @@ CREATE INDEX idx_minibus_status ON minibuses(status);
 CREATE INDEX idx_booking_status ON bookings(status);
 CREATE INDEX idx_booking_date ON bookings(start_date);
 CREATE INDEX idx_booking_datetime ON bookings(start_date, pickup_time);
+CREATE INDEX idx_booking_reschedule ON bookings(reschedule_request);
+CREATE INDEX idx_booking_logs_booking ON booking_logs(booking_id);
 
 -- Create trigger to prevent assigning already assigned drivers
 DELIMITER //
@@ -193,4 +209,4 @@ INSERT INTO users (name, email, phone, password, role) VALUES
 -- Note: These commands need to be run in the shell, not in MySQL
 -- mkdir -p assets/images/minibuses
 -- mkdir -p assets/css
--- mkdir -p assets/pictures 
+-- mkdir -p assets/pictures

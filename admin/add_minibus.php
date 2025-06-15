@@ -2,8 +2,7 @@
 session_start();
 require_once '../config/database.php';
 
-// Debug session information
-error_log("Session data: " . print_r($_SESSION, true));
+// Debug session information (removed for performance)
 
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id'])) {
@@ -18,9 +17,20 @@ if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_submitted'])) {
     try {
         $pdo->beginTransaction();
+
+        // Check for existing minibus with the same name (case-insensitive)
+        $minibus_name = trim($_POST['name']);
+        if (empty($minibus_name)) {
+            throw new Exception("Minibus name cannot be empty.");
+        }
+        $check_stmt = $pdo->prepare("SELECT id FROM minibuses WHERE LOWER(name) = LOWER(?)");
+        $check_stmt->execute([$minibus_name]);
+        if ($check_stmt->fetch()) {
+            throw new Exception("A minibus with this name already exists. Please use a different name.");
+        }
 
         // Validate required fields
         if (empty($_POST['name']) || empty($_POST['capacity']) || empty($_POST['price_per_km'])) {
@@ -54,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $driver_id = !empty($_POST['driver_id']) ? $_POST['driver_id'] : null;
         
         $stmt->execute([
-            'name' => $_POST['name'],
+            'name' => $minibus_name,
             'capacity' => $_POST['capacity'],
             'price_per_km' => $_POST['price_per_km'],
             'features' => $features_json,
@@ -63,13 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         $minibus_id = $pdo->lastInsertId();
-        error_log("New minibus created with ID: " . $minibus_id . " and features: " . $features_json);
 
         // Update driver status if assigned
         if ($driver_id) {
             $stmt = $pdo->prepare("UPDATE drivers SET status = 'assigned' WHERE id = ?");
             $stmt->execute([$driver_id]);
-            error_log("Driver status updated to 'assigned' for ID: " . $driver_id);
         }
 
         // Handle image uploads
@@ -99,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             VALUES (?, ?, ?)
                         ");
                         $stmt->execute([$minibus_id, 'uploads/minibuses/' . $new_file_name, $key]);
-                        error_log("Image uploaded for minibus ID: " . $minibus_id);
                     } else {
                         throw new Exception("Failed to upload image: " . $file_name);
                     }
@@ -108,7 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
-        error_log("Transaction committed successfully for minibus ID: " . $minibus_id);
         $_SESSION['success_message'] = "Minibus added successfully!";
         header("Location: minibuses.php");
         exit();
@@ -117,12 +123,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        
         $_SESSION['error_message'] = $e->getMessage();
+        $_SESSION['show_add_modal'] = true;
         header("Location: minibuses.php");
         exit();
     }
 } else {
     header("Location: minibuses.php");
     exit();
-} 
+}
