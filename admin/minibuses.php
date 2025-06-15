@@ -59,6 +59,7 @@ $maintenance_minibuses = count(array_filter($minibuses, fn($m) => $m['status'] =
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="60">
     <title>Manage Minibuses - Safari Minibus Rentals</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
@@ -97,23 +98,82 @@ $maintenance_minibuses = count(array_filter($minibuses, fn($m) => $m['status'] =
         .minibus-card:hover .action-buttons {
             opacity: 1;
         }
-        /* Table scroll styles */
+        /* Table styles */
         .table-responsive {
-            max-height: 500px;
-            min-height: 200px;
-            overflow-y: scroll;
-            border: 1px solid #ddd;
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
         }
         .table-responsive::-webkit-scrollbar {
-            width: 12px;
+            width: 8px;
         }
         .table-responsive::-webkit-scrollbar-thumb {
             background: #888;
-            border-radius: 6px;
+            border-radius: 4px;
         }
         .table-responsive::-webkit-scrollbar-track {
             background: #f1f1f1;
-            border-radius: 6px;
+            border-radius: 4px;
+        }
+        /* Table header styles */
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background: #2d5016 !important;
+            color: white !important;
+            z-index: 1;
+            white-space: nowrap;
+            padding: 12px 16px;
+            font-weight: 600;
+            border-bottom: 2px solid #1a2f0d;
+        }
+        .table thead th i {
+            margin-right: 6px;
+        }
+        /* Image preview styles */
+        .image-preview-container {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            min-width: 180px;
+        }
+        .image-preview-container img {
+            width: 50px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            transition: transform 0.2s;
+        }
+        .image-preview-container img:hover {
+            transform: scale(1.1);
+            z-index: 1;
+        }
+        .image-count {
+            width: 50px;
+            height: 40px;
+            background: #6c757d;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        /* Name column styles */
+        .minibus-name {
+            font-weight: 600;
+            color: #2d5016;
+            margin-bottom: 4px;
+            min-width: 150px;
+        }
+        .minibus-id {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        /* Table cell styles */
+        .table td {
+            padding: 12px 16px;
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -228,17 +288,17 @@ $maintenance_minibuses = count(array_filter($minibuses, fn($m) => $m['status'] =
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
-                                <thead class="table-light sticky-top bg-light">
+                                <thead class="table-light sticky-top">
                                     <tr>
-                                        <th>ID</th>
-                                        <th>Images</th>
-                                        <th>Name</th>
-                                        <th>Capacity</th>
-                                        <th>Price/1km (TZS)</th>
-                                        <th>Features</th>
-                                        <th>Driver</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
+                                        <th style="width: 80px"><i class="bi bi-hash"></i>ID</th>
+                                        <th style="width: 180px"><i class="bi bi-images"></i>Images</th>
+                                        <th style="width: 200px"><i class="bi bi-truck"></i>Name</th>
+                                        <th style="width: 120px"><i class="bi bi-people"></i>Capacity</th>
+                                        <th style="width: 150px"><i class="bi bi-currency-dollar"></i>Price/1km (TZS)</th>
+                                        <th><i class="bi bi-list-check"></i>Features</th>
+                                        <th style="width: 200px"><i class="bi bi-person-badge"></i>Driver</th>
+                                        <th style="width: 120px"><i class="bi bi-circle-fill"></i>Status</th>
+                                        <th style="width: 100px"><i class="bi bi-gear"></i>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -247,32 +307,28 @@ $maintenance_minibuses = count(array_filter($minibuses, fn($m) => $m['status'] =
                                     <?php else: ?>
                                         <?php foreach ($minibuses as $minibus): ?>
                                         <tr>
-                                            <td class="align-middle">#<?php echo str_pad($minibus['id'], 3, '0', STR_PAD_LEFT); ?></td>
+                                            <td class="minibus-id">#<?php echo str_pad($minibus['id'], 3, '0', STR_PAD_LEFT); ?></td>
                                             <td>
-                                                <div class="image-preview-container d-flex gap-2">
+                                                <div class="image-preview-container">
                                                     <?php if (!empty($minibus['images'])): ?>
                                                         <?php foreach (array_slice($minibus['images'], 0, 3) as $image): ?>
                                                             <img src="../<?php echo htmlspecialchars($image); ?>" 
                                                                  alt="Minibus" 
-                                                                 class="img-thumbnail" 
-                                                                 style="width: 80px; height: 60px; object-fit: cover;">
+                                                                 title="Click to view full size">
                                                         <?php endforeach; ?>
                                                         <?php if (count($minibus['images']) > 3): ?>
-                                                            <div class="bg-secondary text-white d-flex align-items-center justify-content-center" 
-                                                                 style="width: 80px; height: 60px;">
+                                                            <div class="image-count">
                                                                 +<?php echo count($minibus['images']) - 3; ?>
                                                             </div>
                                                         <?php endif; ?>
                                                     <?php else: ?>
-                                                        <div class="bg-secondary text-white d-flex align-items-center justify-content-center" 
-                                                             style="width: 80px; height: 60px;">
-                                                            No Image
-                                                        </div>
+                                                        <div class="image-count">No Image</div>
                                                     <?php endif; ?>
                                                 </div>
                                             </td>
-                                            <td class="align-middle">
-                                                <div class="fw-bold"><?php echo htmlspecialchars($minibus['name']); ?></div>
+                                            <td>
+                                                <div class="minibus-name"><?php echo htmlspecialchars($minibus['name']); ?></div>
+                                                <div class="minibus-id">ID: #<?php echo str_pad($minibus['id'], 3, '0', STR_PAD_LEFT); ?></div>
                                             </td>
                                             <td class="align-middle">
                                                 <span class="badge bg-info">
@@ -556,10 +612,45 @@ $maintenance_minibuses = count(array_filter($minibuses, fn($m) => $m['status'] =
             });
         });
 
-        // Auto-refresh every 30 seconds
-        setInterval(() => {
+        // Auto refresh every 1 minute
+        setTimeout(function() {
             window.location.reload();
-        }, 30000);
+        }, 60000); // 60000 milliseconds = 1 minute
+
+        // Show refresh notification
+        function showRefreshNotification() {
+            const notification = document.createElement('div');
+            notification.className = 'position-fixed bottom-0 end-0 p-3';
+            notification.style.zIndex = '5';
+            notification.innerHTML = `
+                <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-primary text-white">
+                        <i class="bi bi-arrow-clockwise me-2"></i>
+                        <strong class="me-auto">Auto Refresh</strong>
+                        <small>Just now</small>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        Page will refresh in <span id="countdown">60</span> seconds
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(notification);
+
+            // Update countdown
+            let timeLeft = 60;
+            const countdownElement = document.getElementById('countdown');
+            const countdownInterval = setInterval(() => {
+                timeLeft--;
+                countdownElement.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+        }
+
+        // Show notification when page loads
+        document.addEventListener('DOMContentLoaded', showRefreshNotification);
 
         document.getElementById('exterior_image').addEventListener('change', function(event) {
             const file = event.target.files[0];

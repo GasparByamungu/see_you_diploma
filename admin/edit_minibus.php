@@ -351,7 +351,6 @@ $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <select class="form-select" id="status" name="status" required>
                                     <option value="available" <?php echo $minibus['status'] === 'available' ? 'selected' : ''; ?>>Available</option>
                                     <option value="maintenance" <?php echo $minibus['status'] === 'maintenance' ? 'selected' : ''; ?>>Maintenance</option>
-                                    <option value="unavailable" <?php echo $minibus['status'] === 'unavailable' ? 'selected' : ''; ?>>Unavailable</option>
                                 </select>
                             </div>
 
