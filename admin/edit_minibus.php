@@ -472,6 +472,29 @@ $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     }
                 });
             }
+
+            // Add event listeners for date and time changes
+            document.getElementById('start_date').addEventListener('change', updateBookingSummary);
+            document.getElementById('pickup_time').addEventListener('change', updateBookingSummary);
+
+            // Function to update booking summary
+            function updateBookingSummary() {
+                const pickupDate = document.getElementById('start_date').value;
+                const pickupTime = document.getElementById('pickup_time').value;
+                const pickupLocation = document.getElementById('pickupLocationDisplay').textContent;
+                const dropoffLocation = document.getElementById('dropoffLocationDisplay').textContent;
+                const distance = document.getElementById('route_distance').value;
+                const duration = document.getElementById('route_duration').value;
+                const totalPrice = document.getElementById('total_price').value;
+                
+                // Update summary elements
+                document.getElementById('summary_pickup_date').textContent = new Date(pickupDate).toLocaleDateString();
+                document.getElementById('summary_pickup_time').textContent = pickupTime;
+                document.getElementById('summary_pickup_location').textContent = `From: ${pickupLocation} To: ${dropoffLocation}`;
+                document.getElementById('summary_route_distance').textContent = `${distance} km`;
+                document.getElementById('summary_route_duration').textContent = `${duration} minutes`;
+                document.getElementById('summary_total_price').textContent = `TZS ${parseFloat(totalPrice).toLocaleString()}`;
+            }
         });
     </script>
 </body>

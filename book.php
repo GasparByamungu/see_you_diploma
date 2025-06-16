@@ -1228,25 +1228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }, 100);
         });
 
-        // Function to update booking summary
-        function updateBookingSummary() {
-            const pickupDate = document.getElementById('start_date').value;
-            const pickupTime = document.getElementById('pickup_time').value;
-            const pickupLocation = document.getElementById('pickupLocationDisplay').textContent;
-            const dropoffLocation = document.getElementById('dropoffLocationDisplay').textContent;
-            const distance = document.getElementById('route_distance').value;
-            const duration = document.getElementById('route_duration').value;
-            const totalPrice = document.getElementById('total_price').value;
-            
-            // Update summary elements
-            document.getElementById('summary_pickup_date').textContent = new Date(pickupDate).toLocaleDateString();
-            document.getElementById('summary_pickup_time').textContent = pickupTime;
-            document.getElementById('summary_pickup_location').textContent = `From: ${pickupLocation} To: ${dropoffLocation}`;
-            document.getElementById('summary_route_distance').textContent = `${distance} km`;
-            document.getElementById('summary_route_duration').textContent = `${duration} minutes`;
-            document.getElementById('summary_total_price').textContent = `TZS ${parseFloat(totalPrice).toLocaleString()}`;
-        }
-
         // Function to update route
         function updateRoute() {
             const pickupLat = parseFloat(document.getElementById('pickup_latitude').value);
@@ -1263,9 +1244,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         L.latLng(pickupLat, pickupLng),
                         L.latLng(dropoffLat, dropoffLng)
                     ]);
+
+                    // Listen for route calculation completion
+                    routingControl.on('routesfound', function(e) {
+                        const routes = e.routes;
+                        if (routes && routes.length > 0) {
+                            const route = routes[0];
+                            const distance = (route.summary.totalDistance / 1000).toFixed(1); // Convert to km
+                            const duration = Math.round(route.summary.totalTime / 60); // Convert to minutes
+                            const pricePerKm = parseFloat(document.getElementById('price_per_km').value);
+                            const totalPrice = Math.ceil(distance * pricePerKm);
+
+                            // Update hidden fields
+                            document.getElementById('route_distance').value = distance;
+                            document.getElementById('route_duration').value = duration;
+                            document.getElementById('total_price').value = totalPrice;
+
+                            // Update booking summary
+                            updateBookingSummary();
+                        }
+                    });
                 } catch (error) {
                     console.error('Error updating route:', error);
                 }
+            }
+        }
+
+        // Function to update booking summary
+        function updateBookingSummary() {
+            const pickupDate = document.getElementById('start_date').value;
+            const pickupTime = document.getElementById('pickup_time').value;
+            const pickupLocation = document.getElementById('pickup_location').value;
+            const dropoffLocation = document.getElementById('dropoff_location').value;
+            const distance = document.getElementById('route_distance').value;
+            const duration = document.getElementById('route_duration').value;
+            const totalPrice = document.getElementById('total_price').value;
+            
+            // Update summary elements
+            document.getElementById('summary_pickup_date').textContent = pickupDate ? new Date(pickupDate).toLocaleDateString() : 'Not selected';
+            document.getElementById('summary_pickup_time').textContent = pickupTime || 'Not selected';
+            document.getElementById('summary_pickup_location').textContent = `From: ${pickupLocation || 'Select pickup location'} To: ${dropoffLocation || 'Select dropoff location'}`;
+            document.getElementById('summary_route_distance').textContent = `${distance || '0'} km`;
+            document.getElementById('summary_route_duration').textContent = `${duration || '0'} minutes`;
+            document.getElementById('summary_total_price').textContent = `TZS ${parseFloat(totalPrice || '0').toLocaleString()}`;
+        }
+
+        // Function to get address from coordinates
+        async function getAddressFromCoordinates(latlng, isPickup) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`);
+                const data = await response.json();
+                
+                if (data && data.display_name) {
+                    const locationName = data.display_name.split(',').slice(0, 3).join(','); // Get first 3 parts of address
+                    if (isPickup) {
+                        document.getElementById('pickup_location').value = locationName;
+                        document.getElementById('pickupLocationDisplay').textContent = locationName;
+                    } else {
+                        document.getElementById('dropoff_location').value = locationName;
+                        document.getElementById('dropoffLocationDisplay').textContent = locationName;
+                    }
+                    updateBookingSummary();
+                }
+            } catch (error) {
+                console.error('Error getting address:', error);
             }
         }
 
