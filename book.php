@@ -934,8 +934,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         </label>
                                         <select class="form-select form-select-lg" id="pickup_time" name="pickup_time" required style="display: block !important; visibility: visible !important; opacity: 1 !important;">
                                             <option value="" disabled selected>Select pickup time</option>
+                                            <?php
+                                            // Generate time options in 12-hour format
+                                            for ($hour = 0; $hour < 24; $hour++) {
+                                                // Format for o'clock times
+                                                $time = sprintf("%02d:00", $hour);
+                                                $display = date("g:i A", strtotime($time));
+                                                echo "<option value=\"$time\">$display</option>";
+                                                
+                                                // Format for half past times
+                                                $time = sprintf("%02d:30", $hour);
+                                                $display = date("g:i A", strtotime($time));
+                                                echo "<option value=\"$time\">$display</option>";
+                                            }
+                                            ?>
                                         </select>
-                                        <small class="text-muted">Choose your preferred pickup time</small>
                                     </div>
                                 </div>
 
