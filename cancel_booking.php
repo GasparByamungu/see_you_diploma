@@ -39,10 +39,11 @@ try {
     $stmt = $pdo->prepare("
         UPDATE bookings 
         SET status = 'cancelled', 
+            cancellation_reason = ?,
             updated_at = CURRENT_TIMESTAMP 
         WHERE id = ? AND user_id = ?
     ");
-    $stmt->execute([$booking_id, $_SESSION['user_id']]);
+    $stmt->execute([$_POST['cancel_reason'], $booking_id, $_SESSION['user_id']]);
 
     // Commit transaction
     $pdo->commit();

@@ -19,7 +19,12 @@ $total_pages = ceil($total_count / $limit);
 
 // Get bookings with pagination
 $stmt = $pdo->prepare("
-    SELECT b.*,
+    SELECT b.id, b.minibus_id, b.user_id, b.start_date, b.pickup_time, 
+           b.pickup_location, b.pickup_latitude, b.pickup_longitude,
+           b.dropoff_location, b.dropoff_latitude, b.dropoff_longitude,
+           b.route_distance, b.route_duration, b.total_price, b.notes,
+           b.status, b.cancellation_reason, b.reschedule_request,
+           b.created_at, b.updated_at,
            u.name as user_name, u.phone as user_phone,
            m.name as minibus_name, m.capacity,
            d.name as driver_name, d.phone as driver_phone,
@@ -257,26 +262,26 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </span>
                                 </td>
                                 <td>
-                                    <div class="btn-group">
-                                        <button type="button" class="btn btn-sm btn-primary" 
-                                                onclick="showModal('viewBookingModal<?php echo $booking['id']; ?>')">
+                                    <?php if ($booking['status'] === 'confirmed' || $booking['status'] === 'cancelled'): ?>
+                                        <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#viewBookingModal<?php echo $booking['id']; ?>">
                                             <i class="bi bi-eye"></i>
                                         </button>
-                                        <form action="update_booking.php" method="POST" class="d-inline">
-                                            <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
-                                            <input type="hidden" name="status" value="confirmed">
-                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Are you sure you want to confirm this booking?')">
-                                                <i class="bi bi-check-circle"></i> Confirm
+                                    <?php else: ?>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#viewBookingModal<?php echo $booking['id']; ?>">
+                                                <i class="bi bi-eye"></i>
                                             </button>
-                                        </form>
-                                        <form action="update_booking.php" method="POST" class="d-inline">
-                                            <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
-                                            <input type="hidden" name="status" value="cancelled">
-                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to cancel this booking?')">
-                                                <i class="bi bi-x-circle"></i> Cancel
+                                            <?php if ($booking['status'] === 'pending'): ?>
+                                            <button type="button" class="btn btn-success btn-sm" onclick="confirmBooking(<?php echo $booking['id']; ?>)">
+                                                <i class="bi bi-check-lg"></i>
                                             </button>
-                                        </form>
-                                    </div>
+                                            
+                                            <?php endif; ?>
+                                            <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelBookingModal<?php echo $booking['id']; ?>">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -319,87 +324,60 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="modal fade" id="viewBookingModal<?php echo $booking['id']; ?>" tabindex="-1" aria-labelledby="viewBookingModalLabel<?php echo $booking['id']; ?>" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="viewBookingModalLabel<?php echo $booking['id']; ?>">
-                        <i class="bi bi-calendar-check me-2"></i>Booking Details #<?php echo str_pad($booking['id'], 4, '0', STR_PAD_LEFT); ?>
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewBookingModalLabel<?php echo $booking['id']; ?>">Booking Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-6 mb-4">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title text-primary">
-                                        <i class="bi bi-person me-2"></i>Customer Information
-                                    </h6>
-                                    <p class="mb-2"><strong>Name:</strong> <?php echo htmlspecialchars($booking['user_name']); ?></p>
-                                    <p class="mb-0"><strong>Phone:</strong> <?php echo htmlspecialchars($booking['user_phone']); ?></p>
-                                </div>
-                            </div>
+                        <div class="col-md-6">
+                            <p><strong>Booking ID:</strong> <?php echo $booking['id']; ?></p>
+                            <p><strong>Customer:</strong> <?php echo htmlspecialchars($booking['user_name']); ?></p>
+                            <p><strong>Phone:</strong> <?php echo htmlspecialchars($booking['user_phone']); ?></p>
+                            <p><strong>Minibus:</strong> <?php echo htmlspecialchars($booking['minibus_name']); ?></p>
+                            <p><strong>Driver:</strong> <?php echo $booking['driver_name'] ? htmlspecialchars($booking['driver_name']) : 'Not assigned'; ?></p>
                         </div>
-                        <div class="col-md-6 mb-4">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title text-primary">
-                                        <i class="bi bi-truck me-2"></i>Vehicle Information
-                                    </h6>
-                                    <p class="mb-2"><strong>Minibus:</strong> <?php echo htmlspecialchars($booking['minibus_name']); ?></p>
-                                    <p class="mb-2"><strong>Capacity:</strong> <?php echo $booking['capacity']; ?> seats</p>
-                                    <p class="mb-0"><strong>Driver:</strong>
-                                        <?php echo $booking['driver_name'] ? htmlspecialchars($booking['driver_name']) : 'Not assigned'; ?>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title text-primary">
-                                <i class="bi bi-calendar-event me-2"></i>Booking Details
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p class="mb-2"><strong>Start Date:</strong> <?php echo date('M d, Y', strtotime($booking['start_date'])); ?></p>
-                                    <p class="mb-2"><strong>Pickup Time:</strong> <?php echo date('h:i A', strtotime($booking['pickup_time'])); ?></p>
-                                    <p class="mb-2"><strong>Pickup Location:</strong> <?php echo htmlspecialchars($booking['pickup_location']); ?></p>
-                                </div>
-                                <div class="col-md-6">
-                                    <?php if (!empty($booking['dropoff_location'])): ?>
-                                    <p class="mb-2"><strong>Dropoff Location:</strong> <?php echo htmlspecialchars($booking['dropoff_location']); ?></p>
+                        <div class="col-md-6">
+                            <p><strong>Pickup Date:</strong> <?php echo date('M d, Y', strtotime($booking['start_date'])); ?></p>
+                            <p><strong>Pickup Time:</strong> <?php echo date('h:i A', strtotime($booking['pickup_time'])); ?></p>
+                            <p><strong>Pickup Location:</strong> <?php echo htmlspecialchars($booking['pickup_location']); ?></p>
+                            <?php if (!empty($booking['dropoff_location'])): ?>
+                            <p><strong>Dropoff Location:</strong> <?php echo htmlspecialchars($booking['dropoff_location']); ?></p>
+                            <?php endif; ?>
+                            <p><strong>Total Price:</strong> TZS <?php echo number_format($booking['total_price']); ?></p>
+                            <p><strong>Status:</strong> 
+                                <span class="badge bg-<?php 
+                                    echo $booking['status'] === 'confirmed' ? 'success' : 
+                                        ($booking['status'] === 'pending' ? 'warning' : 
+                                        ($booking['status'] === 'cancelled' ? 'danger' : 'info')); 
+                                ?>">
+                                    <?php echo ucfirst($booking['status']); ?>
+                                </span>
+                            </p>
+                            <?php if ($booking['status'] === 'cancelled'): ?>
+                                <?php 
+                                // Debug information
+                                error_log("Booking ID: " . $booking['id']);
+                                error_log("Status: " . $booking['status']);
+                                error_log("Cancellation Reason: " . ($booking['cancellation_reason'] ?? 'null'));
+                                ?>
+                                <div class="alert alert-danger mt-3">
+                                    <strong>Cancellation Information:</strong><br>
+                                    <?php if (!empty($booking['cancellation_reason'])): ?>
+                                        <strong>Reason:</strong> <?php echo nl2br(htmlspecialchars($booking['cancellation_reason'])); ?>
+                                    <?php else: ?>
+                                        <em>No reason was provided for cancellation.</em>
                                     <?php endif; ?>
-                                    <p class="mb-2"><strong>Total Price:</strong> <span class="text-success fw-bold">TZS <?php echo number_format($booking['total_price']); ?></span></p>
-                                    <p class="mb-0"><strong>Status:</strong>
-                                        <span class="badge bg-<?php
-                                            echo $booking['status'] == 'confirmed' ? 'success' :
-                                                ($booking['status'] == 'pending' ? 'warning' :
-                                                ($booking['status'] == 'cancelled' ? 'danger' : 'info'));
-                                        ?>">
-                                            <?php echo ucfirst($booking['status']); ?>
-                                        </span>
-                                    </p>
                                 </div>
-                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <?php if ($booking['status'] == 'pending'): ?>
-                    <form action="update_booking.php" method="POST" class="d-inline">
-                        <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
-                        <input type="hidden" name="status" value="confirmed">
-                        <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to confirm this booking?')">
-                            <i class="bi bi-check-circle me-2"></i>Confirm Booking
-                        </button>
-                    </form>
-                    <form action="update_booking.php" method="POST" class="d-inline">
-                        <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
-                        <input type="hidden" name="status" value="cancelled">
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to cancel this booking?')">
-                            <i class="bi bi-x-circle me-2"></i>Cancel Booking
-                        </button>
-                    </form>
+                    <?php if ($booking['status'] === 'pending'): ?>
+                    <button type="button" class="btn btn-warning" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#rescheduleBookingModal<?php echo $booking['id']; ?>">
+                        <i class="bi bi-calendar-event me-1"></i>Reschedule Booking
+                    </button>
                     <?php endif; ?>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
@@ -407,6 +385,64 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
     <?php endforeach; ?>
+
+    <!-- Reschedule Booking Modal -->
+    <div class="modal fade" id="rescheduleBookingModal<?php echo $booking['id']; ?>" tabindex="-1" aria-labelledby="rescheduleBookingModalLabel<?php echo $booking['id']; ?>" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rescheduleBookingModalLabel<?php echo $booking['id']; ?>">Reschedule Booking</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="rescheduleForm<?php echo $booking['id']; ?>" action="reschedule_booking.php" method="POST">
+                        <input type="hidden" name="booking_id" value="<?php echo $booking['id']; ?>">
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="reschedule_date<?php echo $booking['id']; ?>" class="form-label">New Pickup Date</label>
+                                <input type="date" class="form-control" id="reschedule_date<?php echo $booking['id']; ?>" name="start_date" required min="<?php echo date('Y-m-d'); ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="reschedule_time<?php echo $booking['id']; ?>" class="form-label">New Pickup Time</label>
+                                <select class="form-select" id="reschedule_time<?php echo $booking['id']; ?>" name="pickup_time" required>
+                                    <option value="">Select pickup time</option>
+                                    <?php
+                                    // Generate time options in 12-hour format
+                                    for ($hour = 0; $hour < 24; $hour++) {
+                                        // Format for o'clock times
+                                        $time = sprintf("%02d:00", $hour);
+                                        $display = date("g:i A", strtotime($time));
+                                        echo "<option value=\"$time\">$display</option>";
+                                        
+                                        // Format for half past times
+                                        $time = sprintf("%02d:30", $hour);
+                                        $display = date("g:i A", strtotime($time));
+                                        echo "<option value=\"$time\">$display</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="reschedule_reason<?php echo $booking['id']; ?>" class="form-label">Reason for Rescheduling</label>
+                            <textarea class="form-control" id="reschedule_reason<?php echo $booking['id']; ?>" name="reschedule_reason" rows="3" required></textarea>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> The customer will be notified of this rescheduling request and will need to confirm the new date and time.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitReschedule(<?php echo $booking['id']; ?>)">Submit Reschedule Request</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -470,6 +506,32 @@ $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
             } else {
                 console.error('Modal element not found:', modalId);
             }
+        }
+
+        function submitReschedule(bookingId) {
+            const form = document.getElementById('rescheduleForm' + bookingId);
+            const formData = new FormData(form);
+
+            fetch('reschedule_booking.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert('Reschedule request submitted successfully');
+                    // Reload the page to show updated status
+                    window.location.reload();
+                } else {
+                    // Show error message
+                    alert(data.message || 'Error submitting reschedule request');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error submitting reschedule request');
+            });
         }
     </script>
 </body>
